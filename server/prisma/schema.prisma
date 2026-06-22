@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ========== 商品分类 ==========
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String
+  slug      String    @unique
+  sortOrder Int       @default(0) @map("sort_order")
+  status    String    @default("active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  products  Product[]
+
+  @@map("categories")
+}
+
+// ========== 商品 (SPU) ==========
+model Product {
+  id           Int         @id @default(autoincrement())
+  categoryId   Int         @map("category_id")
+  category     Category    @relation(fields: [categoryId], references: [id])
+  name         String
+  description  String?
+  price        Float
+  currency     String      @default("CNY")
+  coverImage   String?     @map("cover_image")
+  status       String      @default("active")
+  stockVisible Boolean     @default(true) @map("stock_visible")
+  sortOrder    Int         @default(0) @map("sort_order")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  inventory    Inventory[]
+  orderItems   OrderItem[]
+
+  @@map("products")
+}
+
+// ========== 库存卡密 (SKU) 核心安全表 ==========
+model Inventory {
+  id                   Int        @id @default(autoincrement())
+  productId            Int        @map("product_id")
+  product              Product    @relation(fields: [productId], references: [id])
+  cardContentEncrypted String     @map("card_content_encrypted")
+  cardContentHash      String     @map("card_content_hash")
+  status               String     @default("available")
+  orderItemId          Int?       @map("order_item_id")
+  orderItem            OrderItem? @relation(fields: [orderItemId], references: [id])
+  createdAt            DateTime   @default(now()) @map("created_at")
+  soldAt               DateTime?  @map("sold_at")
+
+  @@index([productId, status])
+  @@map("inventory")
+}
+
+// ========== 订单 ==========
+model Order {
+  id            Int         @id @default(autoincrement())
+  orderNo       String      @unique @map("order_no")
+  email         String
+  accessPin     String      @map("access_pin")
+  totalAmount   Float       @map("total_amount")
+  currency      String      @default("CNY")
+  status        String      @default("pending")
+  paymentMethod String?     @map("payment_method")
+  paymentRef    String?     @map("payment_ref")
+  paidAt        DateTime?   @map("paid_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  items         OrderItem[]
+  payments      Payment[]
+
+  @@index([email, createdAt])
+  @@index([status, createdAt])
+  @@map("orders")
+}
+
+// ========== 订单明细 ==========
+model OrderItem {
+  id        Int        @id @default(autoincrement())
+  orderId   Int        @map("order_id")
+  order     Order      @relation(fields: [orderId], references: [id])
+  productId Int        @map("product_id")
+  product   Product    @relation(fields: [productId], references: [id])
+  quantity  Int        @default(1)
+  unitPrice Float      @map("unit_price")
+  inventory Inventory[]
+
+  @@map("order_items")
+}
+
+// ========== 支付记录 ==========
+model Payment {
+  id          Int      @id @default(autoincrement())
+  orderId     Int      @map("order_id")
+  order       Order    @relation(fields: [orderId], references: [id])
+  method      String
+  amount      Float
+  currency    String   @default("CNY")
+  txHash      String?  @unique @map("tx_hash")
+  tradeNo     String?  @unique @map("trade_no")
+  status      String   @default("pending")
+  callbackRaw String?  @map("callback_raw")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([orderId, status])
+  @@map("payments")
+}
+
+// ========== 管理员 ==========
+model Admin {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String    @map("password_hash")
+  role         String    @default("admin")
+  lastLogin    DateTime? @map("last_login")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("admins")
+}
+
+// ========== 支付配置 ==========
+model PaymentConfig {
+  id         Int      @id @default(autoincrement())
+  method     String   @unique
+  configJson String   @map("config_json")
+  status     String   @default("active")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("payment_configs")
+}
+
+// ========== 操作审计日志 ==========
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  adminId   Int?     @map("admin_id")
+  action    String
+  target    String?
+  detail    String?
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
+// ========== 登录失败记录（防爆破） ==========
+model LoginAttempt {
+  id        Int      @id @default(autoincrement())
+  ip        String
+  username  String
+  success   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ip, createdAt])
+  @@map("login_attempts")
+}
+
+// ========== IP 黑名单 ==========
+model IpBlacklist {
+  id        Int      @id @default(autoincrement())
+  ip        String   @unique
+  reason    String
+  blockedUntil DateTime? @map("blocked_until")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ip_blacklist")
+}

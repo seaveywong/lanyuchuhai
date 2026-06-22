@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.db
+*.db-journal
+*.db-wal
+.env
+.DS_Store
+release/
+keygo-secure-platform-v3/
+keygo-secure-platform-v3.zip
+release/

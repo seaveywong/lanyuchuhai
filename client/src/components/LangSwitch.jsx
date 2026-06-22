@@ -1,0 +1,2 @@
+import{useTranslation}from'react-i18next';
+export default function LangSwitch(){const{i18n,t}=useTranslation();const zh=i18n.language==='zh';return(<button onClick={()=>{const n=zh?'en':'zh';i18n.changeLanguage(n);localStorage.setItem('lang',n)}} style={{background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',color:'#fff',padding:'4px 12px',borderRadius:6,fontSize:12,cursor:'pointer'}}>{t('lang')}</button>)}
