@@ -155,4 +155,25 @@ router.post('/change-password', adminAuth, validateBody(changePasswordSchema), a
   } catch (err) { next(err); }
 });
 
+const changeUsernameSchema = z.object({
+  password: z.string().min(1, '请输入密码确认'),
+  newUsername: z.string().min(3, '用户名至少3位').max(50),
+});
+router.post('/change-username', adminAuth, validateBody(changeUsernameSchema), async (req, res, next) => {
+  try {
+    const { password, newUsername } = req.body;
+    const admin = await prisma.admin.findUnique({ where: { id: req.admin.id } });
+    const valid = await bcrypt.compare(password, admin.passwordHash);
+    if (!valid) return res.status(400).json({ error: '密码错误' });
+
+    const exists = await prisma.admin.findUnique({ where: { username: newUsername } });
+    if (exists) return res.status(400).json({ error: '该用户名已被使用' });
+
+    await prisma.admin.update({ where: { id: req.admin.id }, data: { username: newUsername } });
+    await prisma.auditLog.create({ data: { adminId: req.admin.id, action: 'change_username', detail: `${admin.username} → ${newUsername}`, ip: req.ip } });
+    logger.info('Admin username changed', { old: admin.username, new: newUsername, ip: req.ip });
+    res.json({ success: true, message: '用户名已修改', newUsername });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

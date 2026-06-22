@@ -15,6 +15,7 @@ export const adminApi={
   login:d=>api.post('/admin/login',d),
   getMe:()=>api.get('/admin/me'),
   changePassword:d=>api.post('/admin/change-password',d),
+  changeUsername:d=>api.post('/admin/change-username',d),
   getDashboard:()=>api.get('/admin/dashboard'),
   getProducts:p=>api.get('/admin/products',{params:p}),
   createProduct:d=>api.post('/admin/products',d),
