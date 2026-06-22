@@ -136,4 +136,23 @@ router.get('/me', adminAuth, async (req, res) => {
   res.json({ admin: req.admin });
 });
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, '请输入当前密码'),
+  newPassword: z.string().min(6, '新密码至少6位').max(100),
+});
+router.post('/change-password', adminAuth, validateBody(changePasswordSchema), async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const admin = await prisma.admin.findUnique({ where: { id: req.admin.id } });
+    const valid = await bcrypt.compare(currentPassword, admin.passwordHash);
+    if (!valid) return res.status(400).json({ error: '当前密码错误' });
+
+    const hash = await bcrypt.hash(newPassword, 12);
+    await prisma.admin.update({ where: { id: req.admin.id }, data: { passwordHash: hash } });
+    await prisma.auditLog.create({ data: { adminId: req.admin.id, action: 'change_password', ip: req.ip } });
+    logger.info('Admin password changed', { username: admin.username, ip: req.ip });
+    res.json({ success: true, message: '密码已修改' });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
