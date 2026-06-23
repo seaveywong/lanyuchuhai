@@ -5,6 +5,8 @@ const { AppError } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
 const config = require('../config');
 const { appendLedger } = require('./wallet');
+const { allocateTronWallet } = require('./tronWallet');
+const { cnyToUsdtAmount, getUsdtRuntimeConfig } = require('./payment/config');
 
 const prisma = new PrismaClient();
 
@@ -27,12 +29,31 @@ async function createOrder({ email, accessPin, paymentMethod, items, userId = nu
   });
   const totalAmount = orderItems.reduce((total, item) => total + item.unitPrice * item.quantity, 0);
   const accessPinHash = await bcrypt.hash(accessPin, config.orderAccessPin.rounds);
+  const method = paymentMethod || 'usdt_trc20';
+  const usdtRuntime = method === 'usdt_trc20' ? await getUsdtRuntimeConfig() : null;
   const created = await prisma.$transaction(async (tx) => {
-    const order = await tx.order.create({ data: { userId, orderNo: generateOrderNo(), email: email.toLowerCase().trim(), accessPin: accessPinHash, totalAmount, currency: 'CNY', status: 'pending', paymentMethod: paymentMethod || 'usdt_trc20' } });
-    for (const item of orderItems) await tx.orderItem.create({ data: { orderId: order.id, productId: item.product.id, quantity: item.quantity, unitPrice: item.unitPrice } });
+    const orderData = { userId, orderNo: generateOrderNo(), email: email.toLowerCase().trim(), accessPin: accessPinHash, totalAmount, currency: 'CNY', status: 'pending', paymentMethod: method };
+    if (method === 'usdt_trc20') {
+      const wallet = await allocateTronWallet(tx);
+      orderData.tronWalletId = wallet.id;
+      orderData.expectedUsdt = cnyToUsdtAmount(totalAmount, usdtRuntime.exchangeRate);
+    }
+    const order = await tx.order.create({ data: orderData });
+    const createdItems = [];
+    for (const item of orderItems) {
+      const orderItem = await tx.orderItem.create({ data: { orderId: order.id, productId: item.product.id, quantity: item.quantity, unitPrice: item.unitPrice } });
+      createdItems.push({ ...orderItem, product: item.product });
+    }
+    if (method === 'balance') {
+      if (!userId) throw new AppError('余额支付需要先登录账户', 401);
+      const reference = 'BALANCE_' + order.orderNo;
+      await appendLedger(tx, { userId, amountCents: -Math.round(totalAmount * 100), type: 'purchase_debit', orderId: order.id, reference, note: '订单支付' });
+      await fulfillOrder(tx, { ...order, items: createdItems }, 'balance', reference);
+      await tx.payment.create({ data: { orderId: order.id, method: 'balance', amount: totalAmount, currency: 'CNY', tradeNo: reference, status: 'success' } });
+    }
     return order;
   });
-  return prisma.order.findUnique({ where: { id: created.id }, include: { items: { include: { product: { select: { name: true } } } } } });
+  return prisma.order.findUnique({ where: { id: created.id }, include: { items: { include: { product: { select: { name: true } } } }, tronWallet: { select: { address: true, label: true } } } });
 }
 
 async function fulfillOrder(tx, order, method, paymentRef) {
@@ -54,6 +75,27 @@ async function confirmPayment(orderId, method, paymentRef) {
     return fulfillOrder(tx, order, method, paymentRef);
   });
   if (confirmed) logger.info('Payment confirmed', { orderId, method });
+}
+
+async function settleOrderPayment({ orderId, method, txHash = null, tradeNo = null, callbackRaw = null }) {
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: { include: { product: true } } } });
+    if (!order) throw new AppError('订单不存在', 404);
+    if (order.status === 'paid') return order;
+    if (txHash) {
+      const used = await tx.payment.findUnique({ where: { txHash } });
+      const topUp = await tx.walletTopUp.findUnique({ where: { txHash } });
+      if (used || topUp) throw new AppError('该交易哈希已被使用', 409);
+    }
+    if (tradeNo) {
+      const used = await tx.payment.findUnique({ where: { tradeNo } });
+      const topUp = await tx.walletTopUp.findUnique({ where: { tradeNo } });
+      if (used || topUp) throw new AppError('该支付流水已被使用', 409);
+    }
+    await tx.payment.create({ data: { orderId: order.id, method, amount: Number(order.totalAmount), currency: order.currency, txHash, tradeNo, status: 'success', callbackRaw } });
+    await fulfillOrder(tx, order, method, txHash || tradeNo);
+    return tx.order.findUnique({ where: { id: order.id }, include: { items: { include: { product: { select: { name: true } } } }, tronWallet: { select: { address: true, label: true } } } });
+  });
 }
 
 async function payWithBalance(userId, orderId) {
@@ -78,4 +120,4 @@ async function cancelOrder(orderId) {
   logger.info('Order cancelled', { orderId, orderNo: order.orderNo });
 }
 
-module.exports = { createOrder, confirmPayment, cancelOrder, payWithBalance };
+module.exports = { createOrder, confirmPayment, settleOrderPayment, cancelOrder, payWithBalance };

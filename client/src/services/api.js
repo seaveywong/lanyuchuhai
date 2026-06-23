@@ -27,6 +27,7 @@ export const publicApi = {
   lookupOrder: (data) => api.post('/public/orders/lookup', data),
   getPaymentConfig: () => api.get('/public/payment/config'),
   createPayment: (data) => api.post('/public/payment/create', data),
+  submitOrderUsdtTx: (data) => api.post('/public/payment/usdt/submit-tx', data),
 };
 
 export const userApi = {
@@ -34,6 +35,9 @@ export const userApi = {
   login: (data) => api.post('/public/auth/login', data),
   getMe: () => api.get('/public/auth/me'),
   getLedger: () => api.get('/public/auth/ledger'),
+  createTopup: (data) => api.post('/public/topups', data),
+  getTopup: (topUpNo) => api.get('/public/topups/' + topUpNo),
+  submitTopupTx: (topUpNo, data) => api.post('/public/topups/' + topUpNo + '/submit-tx', data),
 };
 
 export const adminApi = {
@@ -60,6 +64,10 @@ export const adminApi = {
   getWalletLedger: () => api.get('/admin/wallet/ledger'),
   verifyWalletCredit: (data) => api.post('/admin/wallet/verify-credit', data),
   creditWallet: (data) => api.post('/admin/wallet/credit', data),
+  getTronWallets: () => api.get('/admin/tron-wallets'),
+  createTronWallet: (data) => api.post('/admin/tron-wallets', data),
+  updateTronWallet: (id, data) => api.put('/admin/tron-wallets/' + id, data),
+  rebuildInventorySearchIndex: () => api.post('/admin/inventory/rebuild-search-index'),
   getOrders: (params) => api.get('/admin/orders', { params }),
   getOrderDetail: (id) => api.get('/admin/orders/' + id),
   cancelOrder: (id) => api.post('/admin/orders/' + id + '/cancel'),

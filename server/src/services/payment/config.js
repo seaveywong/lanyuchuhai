@@ -36,11 +36,14 @@ async function getPaymentConfigRows() {
   return rows.map((row) => ({ ...row, config: parsePaymentConfig(row.configJson) }));
 }
 
-function isMethodReady(row) {
+async function isMethodReady(row) {
   if (!row || row.status !== 'active') return false;
   const cfg = row.config || {};
   if (row.method === 'site_settings') return false;
-  if (row.method === 'usdt_trc20') return !!cfg.merchantAddress;
+  if (row.method === 'usdt_trc20') {
+    if (!cfg.trongridApiKey && !appConfig.usdt.trongridApiKey) return false;
+    return (await prisma.tronWallet.count({ where: { status: 'active' } })) > 0;
+  }
   if (row.method === 'alipay' || row.method === 'wechat') return !!(cfg.gatewayUrl && cfg.appId && cfg.appSecret);
   return false;
 }
@@ -51,15 +54,13 @@ async function getPublicPaymentConfig() {
   const usdtConfig = byMethod.get('usdt_trc20')?.config || {};
   const siteConfig = byMethod.get('site_settings')?.config || {};
   const exchangeRate = parseFloat(usdtConfig.exchangeRate || appConfig.usdt.exchangeRate || 7) || 7;
-  const merchantAddress = usdtConfig.merchantAddress || appConfig.usdt.merchantAddress || null;
-  const methods = rows
-    .filter(isMethodReady)
-    .map((row) => ({ method: row.method, label: methodLabels[row.method] || row.method }));
+  const ready = await Promise.all(rows.map(async (row) => ({ row, enabled: await isMethodReady(row) })));
+  const methods = ready.filter((item) => item.enabled).map((item) => ({ method: item.row.method, label: methodLabels[item.row.method] || item.row.method }));
 
   return {
     methods,
     exchangeRate,
-    usdt: { network: 'TRC20', walletAddress: merchantAddress },
+    usdt: { network: 'TRC20' },
     contact: {
       supportEnabled: siteConfig.supportEnabled !== false,
       supportTitle: siteConfig.supportTitle || '联系客服',
@@ -74,13 +75,14 @@ async function getPublicPaymentConfig() {
 }
 
 async function getUsdtRuntimeConfig() {
-  const publicConfig = await getPublicPaymentConfig();
-  return { exchangeRate: publicConfig.exchangeRate, merchantAddress: publicConfig.usdt.walletAddress };
+  const row = await prisma.paymentConfig.findUnique({ where: { method: 'usdt_trc20' } });
+  const cfg = parsePaymentConfig(row?.configJson);
+  return { exchangeRate: parseFloat(cfg.exchangeRate || appConfig.usdt.exchangeRate || 7) || 7, trongridApiKey: cfg.trongridApiKey || appConfig.usdt.trongridApiKey || '' };
 }
 
 function cnyToUsdtAmount(cny, exchangeRate = 7) {
   const amount = Number(cny) / Number(exchangeRate || 7);
-  return Math.ceil(amount * 2) / 2;
+  return Number(amount.toFixed(6));
 }
 
 module.exports = { parsePaymentConfig, getPaymentConfigRows, getPublicPaymentConfig, getUsdtRuntimeConfig, cnyToUsdtAmount, methodLabels };

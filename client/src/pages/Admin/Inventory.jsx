@@ -90,15 +90,15 @@ export default function Inventory() {
 
   const doSearch = async () => {
     const query = searchValue.trim();
-    if (!query) return message.warning(searchType === 'orderNo' ? '请输入订单号' : '请输入完整卡密内容');
+    if (!query) return message.warning(searchType === 'orderNo' ? '请输入订单号' : searchType === 'cardFragment' ? '请输入至少 3 个卡密片段字符' : '请输入完整卡密内容');
 
     setSearching(true);
     try {
       const result = await adminApi.searchInventory({ type: searchType, query });
       setItems(result.items || []);
       setSelectedIds([]);
-      setSearchLabel(searchType === 'orderNo' ? '订单号：' + query : '卡密精确匹配');
-      if (searchType === 'cardContent') setSearchValue('');
+      setSearchLabel(searchType === 'orderNo' ? '订单号：' + query : searchType === 'cardFragment' ? '卡密片段匹配' : '卡密精确匹配');
+      if (searchType !== 'orderNo') setSearchValue('');
       message.success('找到 ' + (result.total || 0) + ' 条库存');
     } catch (err) {
       message.error(err.message || '检索失败');
@@ -224,13 +224,13 @@ export default function Inventory() {
           <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
         </Space>
         <Space wrap>
-          <Select value={searchType} onChange={setSearchType} options={[{ label: '订单号', value: 'orderNo' }, { label: '完整卡密', value: 'cardContent' }]} style={{ width: 118 }} />
-          <Input value={searchValue} onChange={(event) => setSearchValue(event.target.value)} onPressEnter={doSearch} placeholder={searchType === 'orderNo' ? '精确订单号' : '粘贴完整卡密'} style={{ width: 220 }} />
+          <Select value={searchType} onChange={setSearchType} options={[{ label: '订单号', value: 'orderNo' }, { label: '完整卡密', value: 'cardContent' }, { label: '卡密片段', value: 'cardFragment' }]} style={{ width: 118 }} />
+          <Input value={searchValue} onChange={(event) => setSearchValue(event.target.value)} onPressEnter={doSearch} placeholder={searchType === 'orderNo' ? '精确订单号' : searchType === 'cardFragment' ? '至少 3 个字符' : '粘贴完整卡密'} style={{ width: 220 }} />
           <Button type="primary" icon={<SearchOutlined />} loading={searching} onClick={doSearch}>检索</Button>
           {searchLabel && <Button onClick={clearSearch}>返回列表</Button>}
         </Space>
       </Space>
-      {searchType === 'cardContent' && <Text type="secondary" style={{ display: 'block', marginTop: 12, fontSize: 12 }}>卡密仅用于本次 HTTPS 请求的哈希匹配，不会显示在结果、URL 或操作日志中。</Text>}
+      {(searchType === 'cardContent' || searchType === 'cardFragment') && <Text type="secondary" style={{ display: 'block', marginTop: 12, fontSize: 12 }}>{searchType === 'cardFragment' ? '片段检索使用受密钥保护的三字符索引，不回显卡密明文。' : '卡密仅用于本次 HTTPS 请求的哈希匹配，不会显示在结果、URL 或操作日志中。'}</Text>}
     </Card>
 
     <Card bordered={false} style={{ borderRadius: 16 }} title={<Space><span>库存明细</span>{searchLabel && <Tag color="blue">{searchLabel}</Tag>}</Space>} extra={<Space wrap><Button onClick={() => setSelectedIds(allDeletableSelected ? [] : deletableItems.map((item) => item.id))}>{allDeletableSelected ? '取消全选' : '全选可删除'}{deletableItems.length ? ' (' + deletableItems.length + ')' : ''}</Button><Popconfirm title={'确认批量删除选中的 ' + selectedIds.length + ' 条库存？'} okText="删除" okButtonProps={{ danger: true }} onConfirm={doBatchDelete} disabled={!selectedIds.length}><Button danger icon={<DeleteOutlined />} loading={submitting} disabled={!selectedIds.length}>批量删除 {selectedIds.length || ''}</Button></Popconfirm><Button type="primary" icon={<PlusOutlined />} onClick={() => { importForm.resetFields(); importForm.setFieldsValue({ skipFirstRow: true }); setImportFile(null); setImportOpen(true); }}>Excel 导入</Button></Space>}>

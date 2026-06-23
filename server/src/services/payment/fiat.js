@@ -22,7 +22,7 @@ async function createPaymentUrl(order, method) {
     type: method === 'alipay' ? 'alipay' : 'wxpay',
     out_trade_no: order.orderNo,
     notify_url: gateway.notifyUrl || `${getBaseUrl()}/api/callback/${method}`,
-    return_url: gateway.returnUrl || `${getBaseUrl()}/order/${order.orderNo}`,
+    return_url: gateway.returnUrl || `${getBaseUrl()}${order.returnPath || '/order/' + order.orderNo}`,
     name: gateway.productName || '数字商品',
     money: Number(order.totalAmount).toFixed(2),
     sign_type: 'MD5',

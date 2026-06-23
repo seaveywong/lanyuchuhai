@@ -26,6 +26,7 @@ app.use('/api/public', require('./controllers/public/order'));
 app.use('/api/public', require('./controllers/public/payment'));
 app.use('/api/admin', require('./controllers/admin/auth'));
 app.use('/api/admin', require('./controllers/admin/wallet'));
+app.use('/api/admin', require('./controllers/admin/tronWallet'));
 app.use('/api/admin', require('./controllers/admin/product'));
 app.use('/api/admin', require('./controllers/admin/inventory'));
 app.use('/api/admin', require('./controllers/admin/order'));
@@ -36,8 +37,6 @@ app.use((_, res) => res.status(404).json({ error: 'Not found' }));
 app.use(errorHandler);
 
 if (require.main === module) {
-  try { require('./jobs/usdtMonitor'); logger.info('USDT monitor started'); }
-  catch (e) { logger.warn('USDT monitor skipped', { error: e.message }); }
   try { require('./jobs/cleanup'); logger.info('Cleanup job started'); }
   catch (e) { logger.warn('Cleanup skipped', { error: e.message }); }
   app.listen(config.port, () => logger.info('BlueReach API :' + config.port + ' [' + config.nodeEnv + ']'));

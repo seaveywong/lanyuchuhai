@@ -8,6 +8,7 @@ import { publicApi } from '../../services/api';
 import { useCartStore } from '../../store/cartStore';
 import { cnyToUsdt } from '../../utils/format';
 import LangSwitch from '../../components/LangSwitch';
+import AccountMenu from '../../components/AccountMenu';
 
 const gradients = ['#1d4ed8,#0f172a', '#0f766e,#042f2e', '#b45309,#431407', '#be123c,#4c0519', '#4338ca,#111827'];
 
@@ -103,7 +104,7 @@ export default function Home() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             <LangSwitch />
             <Link to="/lookup" style={{ color: '#475569', fontWeight: 700 }}>{t('nav.lookup')}</Link>
-            <Link to="/account" style={{ color: '#475569', fontWeight: 700 }}>账户</Link>
+            <AccountMenu />
             <Badge count={cartCount} size="small"><Button icon={<ShoppingCartOutlined />} onClick={() => navigate('/cart')} style={{ borderRadius: 12 }}>{t('nav.cart')}</Button></Badge>
           </div>
         </div>

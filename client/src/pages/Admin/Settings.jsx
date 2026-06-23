@@ -3,6 +3,7 @@ import { Alert, Button, Card, Col, Divider, Form, Input, InputNumber, Row, Space
 import { CustomerServiceOutlined, LockOutlined, PayCircleOutlined, SafetyOutlined, UserOutlined } from '@ant-design/icons';
 import { adminApi } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import TronWalletPanel from '../../components/admin/TronWalletPanel';
 
 const { Text } = Typography;
 
@@ -58,7 +59,7 @@ function GatewayForm({ form, method, title, description, saving, onSave }) {
           </Col>
           <Col xs={24} lg={12}>
             <Form.Item name="notifyUrl" label="异步回调地址">
-              <Input placeholder="留空则自动使用 https://lanyu888888.com/api/callback/..." />
+              <Input placeholder="留空则由系统生成 /api/callback/..." />
             </Form.Item>
           </Col>
           <Col xs={24} lg={12}>
@@ -157,16 +158,16 @@ export default function Settings() {
             children: (
               <Space direction="vertical" size={16} style={{ width: '100%' }}>
                 <Card bordered={false} style={{ borderRadius: 16 }} title={<Space><PayCircleOutlined />USDT-TRC20</Space>} extra={<Button type="primary" loading={saving === 'usdt_trc20'} onClick={() => saveConfig('usdt_trc20', usdtForm)}>保存</Button>}>
-                  <Alert type="warning" showIcon message="启用前必须填写真实 TRC20 收款地址。未启用或未填地址时，前台不会展示 USDT 支付。" style={{ marginBottom: 18 }} />
+                  <Alert type="warning" showIcon message="USDT 使用地址池分配和 TXID 链上核验。先配置 TronGrid API Key，再在下方添加至少一个公开收款地址。" style={{ marginBottom: 18 }} />
                   <Form form={usdtForm} layout="vertical">
                     <Form.Item name="enabled" label="启用通道" valuePropName="checked"><Switch checkedChildren="启用" unCheckedChildren="停用" /></Form.Item>
                     <Row gutter={16}>
                       <Col xs={24} md={8}><Form.Item name="exchangeRate" label="汇率：1 USDT = ? CNY" rules={[{ required: true, message: '请填写汇率' }]}><InputNumber min={0.1} max={100} step={0.1} precision={2} style={{ width: '100%' }} /></Form.Item></Col>
-                      <Col xs={24} md={16}><Form.Item name="merchantAddress" label="TRC20 收款地址"><Input placeholder="T..." /></Form.Item></Col>
                       <Col xs={24}><Form.Item name="trongridApiKey" label="TronGrid API Key"><Input.Password placeholder="用于后续链上自动核验，可先留空" /></Form.Item></Col>
                     </Row>
                   </Form>
                 </Card>
+                <TronWalletPanel />
                 <GatewayForm form={alipayForm} method="alipay" title="支付宝" description="预埋易支付 / 聚合支付兼容接口：填写网关、商户号和密钥后即可启用。" saving={saving} onSave={saveConfig} />
                 <GatewayForm form={wechatForm} method="wechat" title="微信支付" description="预埋微信/聚合支付兼容接口：与支付宝使用同一套签名和回调结构。" saving={saving} onSave={saveConfig} />
               </Space>

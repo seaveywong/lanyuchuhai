@@ -50,11 +50,9 @@ function sanitizeConfig(method, rawConfig, status) {
 
   if (method === 'usdt_trc20') {
     const exchangeRate = Number(cfg.exchangeRate || 7);
-    const merchantAddress = clean(cfg.merchantAddress);
     if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) throw new Error('汇率必须大于 0');
-    if (merchantAddress && !/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(merchantAddress)) throw new Error('TRC20 收款地址格式不正确');
-    if (status === 'active' && !merchantAddress) throw new Error('启用 USDT 前必须填写收款地址');
-    return { exchangeRate, merchantAddress, trongridApiKey: clean(cfg.trongridApiKey) };
+    if (status === 'active' && !clean(cfg.trongridApiKey)) throw new Error('启用 USDT 前必须填写 TronGrid API Key');
+    return { exchangeRate, trongridApiKey: clean(cfg.trongridApiKey) };
   }
 
   const gatewayUrl = clean(cfg.gatewayUrl).replace(/\/+$/, '');

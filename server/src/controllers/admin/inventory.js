@@ -80,14 +80,20 @@ router.post('/inventory/batch-import', validateBody(importSchema), async (req, r
 const inventorySearchSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('orderNo'), query: z.string().trim().min(1).max(128) }),
   z.object({ type: z.literal('cardContent'), query: z.string().trim().min(1).max(16384) }),
+  z.object({ type: z.literal('cardFragment'), query: z.string().trim().min(3).max(64) }),
 ]);
 
 router.post('/inventory/search', validateBody(inventorySearchSchema), async (req, res, next) => {
   try {
     const query = req.body.query.trim();
-    const where = req.body.type === 'orderNo'
-      ? { orderItem: { is: { order: { is: { orderNo: query } } } } }
-      : { cardContentHash: hash(query) };
+    let where;
+    if (req.body.type === 'orderNo') where = { orderItem: { is: { order: { is: { orderNo: query } } } } };
+    else if (req.body.type === 'cardContent') where = { cardContentHash: hash(query) };
+    else {
+      const tokens = cardService.searchTokens(query).slice(0, 18);
+      if (!tokens.length) return res.status(400).json({ error: '卡密片段至少需要 3 个有效字符' });
+      where = { AND: tokens.map((token) => ({ cardSearchIndex: { contains: '|' + token + '|' } })) };
+    }
     const items = await prisma.inventory.findMany({
       where,
       select: inventorySelect,
@@ -95,7 +101,7 @@ router.post('/inventory/search', validateBody(inventorySearchSchema), async (req
       take: 100,
     });
 
-    logger.info('Inventory exact search', { type: req.body.type, resultCount: items.length, adminId: req.admin.id });
+    logger.info('Inventory search', { type: req.body.type, resultCount: items.length, adminId: req.admin.id });
     res.json({
       items: items.map((item) => ({ ...item, shortHash: item.cardContentHash.slice(0, 12) })),
       total: items.length,
@@ -103,6 +109,27 @@ router.post('/inventory/search', validateBody(inventorySearchSchema), async (req
   } catch (err) {
     next(err);
   }
+});
+
+router.post('/inventory/rebuild-search-index', async (req, res, next) => {
+  try {
+    let cursor = 0;
+    let updated = 0;
+    for (;;) {
+      const batch = await prisma.inventory.findMany({ where: { id: { gt: cursor } }, orderBy: { id: 'asc' }, take: 200, select: { id: true, cardContentEncrypted: true } });
+      if (!batch.length) break;
+      await prisma.$transaction(batch.map((item) => {
+        let cardSearchIndex = null;
+        try { cardSearchIndex = cardService.buildCardSearchIndex(require('../../utils/crypto').decrypt(item.cardContentEncrypted)); }
+        catch (err) { logger.warn('Inventory search index skipped', { inventoryId: item.id, error: err.message }); }
+        return prisma.inventory.update({ where: { id: item.id }, data: { cardSearchIndex } });
+      }));
+      updated += batch.length;
+      cursor = batch[batch.length - 1].id;
+    }
+    logger.info('Inventory search index rebuilt', { updated, adminId: req.admin.id });
+    res.json({ success: true, updated });
+  } catch (err) { next(err); }
 });
 
 const updateSchema = z.object({

@@ -50,6 +50,7 @@ model Inventory {
   product              Product    @relation(fields: [productId], references: [id])
   cardContentEncrypted String     @map("card_content_encrypted")
   cardContentHash      String     @map("card_content_hash")
+  cardSearchIndex      String?    @map("card_search_index")
   status               String     @default("available")
   orderItemId          Int?       @map("order_item_id")
   orderItem            OrderItem? @relation(fields: [orderItemId], references: [id])
@@ -58,6 +59,7 @@ model Inventory {
 
   @@index([productId, status])
   @@index([cardContentHash])
+  @@index([cardSearchIndex])
   @@map("inventory")
 }
 
@@ -73,6 +75,9 @@ model Order {
   status        String      @default("pending")
   paymentMethod String?     @map("payment_method")
   paymentRef    String?     @map("payment_ref")
+  expectedUsdt  Float?      @map("expected_usdt")
+  tronWalletId  Int?        @map("tron_wallet_id")
+  tronWallet    TronWallet? @relation(fields: [tronWalletId], references: [id])
   paidAt        DateTime?   @map("paid_at")
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
@@ -83,6 +88,7 @@ model Order {
   @@index([email, createdAt])
   @@index([status, createdAt])
   @@index([userId, createdAt])
+  @@index([tronWalletId, status])
   @@map("orders")
 }
 
@@ -96,9 +102,50 @@ model User {
   updatedAt     DateTime        @updatedAt @map("updated_at")
   orders        Order[]
   walletLedgers WalletLedger[]
+  topUps        WalletTopUp[]
 
   @@index([status, createdAt])
   @@map("users")
+}
+
+model TronWallet {
+  id             Int           @id @default(autoincrement())
+  address        String        @unique
+  label          String?
+  status         String        @default("active")
+  priority       Int           @default(0)
+  lastAssignedAt DateTime?     @map("last_assigned_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  orders         Order[]
+  topUps         WalletTopUp[]
+
+  @@index([status, priority, lastAssignedAt])
+  @@map("tron_wallets")
+}
+
+model WalletTopUp {
+  id             Int          @id @default(autoincrement())
+  topUpNo        String       @unique @map("top_up_no")
+  userId         Int          @map("user_id")
+  user           User         @relation(fields: [userId], references: [id])
+  amountCents    Int          @map("amount_cents")
+  expectedUsdt   Float?       @map("expected_usdt")
+  paymentMethod  String       @map("payment_method")
+  status         String       @default("pending")
+  tronWalletId   Int?         @map("tron_wallet_id")
+  tronWallet     TronWallet?  @relation(fields: [tronWalletId], references: [id])
+  txHash         String?      @unique @map("tx_hash")
+  tradeNo        String?      @unique @map("trade_no")
+  callbackRaw    String?      @map("callback_raw")
+  paidAt         DateTime?    @map("paid_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([userId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([tronWalletId, status])
+  @@map("wallet_top_ups")
 }
 
 model WalletLedger {

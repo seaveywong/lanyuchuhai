@@ -42,8 +42,17 @@ export default function Cart() {
       .catch(() => setMethods([]));
   }, []);
 
-  const availableMethods = useMemo(() => [...methods, ...(user && Number(user.balanceCents || 0) >= Math.round(total * 100) ? [{ method: 'balance', label: '余额支付' }] : [])], [methods, user, total]);
-  useEffect(() => { setMethod((current) => (availableMethods.some((item) => item.method === current) ? current : availableMethods[0]?.method || null)); }, [availableMethods]);
+  const balanceEnough = Boolean(user && Number(user.balanceCents || 0) >= Math.round(total * 100));
+  const availableMethods = useMemo(() => {
+    const external = methods.filter((item) => item.method !== 'balance');
+    return balanceEnough ? [{ method: 'balance', label: '余额支付' }, ...external] : external;
+  }, [methods, balanceEnough]);
+  useEffect(() => {
+    setMethod((current) => {
+      if (balanceEnough) return 'balance';
+      return availableMethods.some((item) => item.method === current) ? current : availableMethods[0]?.method || null;
+    });
+  }, [availableMethods, balanceEnough]);
   const methodMap = useMemo(() => new Map(availableMethods.map((item) => [item.method, item.label || methodFallback[item.method] || item.method])), [availableMethods]);
 
   const columns = [
@@ -135,6 +144,7 @@ export default function Cart() {
                     <Alert type="error" showIcon message="暂无可用支付方式" description="请联系网站客服，或等待管理员启用支付通道。" />
                   )}
                 </Form.Item>
+                {accessToken && user && !balanceEnough && <Alert type="warning" showIcon message="当前余额不足，不能与外部支付混合支付。" description={<span>可选择外部支付完成本单，或先前往 <Link to="/account">个人中心充值</Link> 后使用余额支付。</span>} style={{ marginBottom: 16 }} />}
                 {method === 'usdt_trc20' && <Alert type="info" showIcon message={`参考金额：${usdt} USDT，实际收款地址以下单后的订单页为准。`} style={{ marginBottom: 16 }} />}
                 {(method === 'alipay' || method === 'wechat') && <Alert type="info" showIcon message="提交订单后会跳转到对应支付通道页面。" style={{ marginBottom: 16 }} />}
                 {method === 'balance' && <Alert type="success" showIcon message={`将从账户余额扣除 ¥${total.toFixed(2)}，当前余额 ¥${(Number(user?.balanceCents || 0) / 100).toFixed(2)}。`} style={{ marginBottom: 16 }} />}

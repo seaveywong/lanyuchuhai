@@ -59,4 +59,8 @@ function hash(content) {
   return crypto.createHash('sha256').update(String(content)).digest('hex');
 }
 
-module.exports = { encrypt, decrypt, hash };
+function hmac(content) {
+  return crypto.createHmac('sha256', KEY).update(String(content)).digest('hex');
+}
+
+module.exports = { encrypt, decrypt, hash, hmac };

@@ -1,8 +1,25 @@
 ﻿const { PrismaClient } = require('@prisma/client');
-const { encrypt, decrypt, hash } = require('../utils/crypto');
+const { encrypt, decrypt, hash, hmac } = require('../utils/crypto');
 const logger = require('../utils/logger');
 
 const prisma = new PrismaClient();
+
+function normalizeForSearch(content) {
+  return Array.from(String(content || '').normalize('NFKC').toLowerCase()).filter((char) => !/\s/.test(char)).join('');
+}
+
+function searchTokens(content) {
+  const value = normalizeForSearch(content);
+  if (value.length < 3) return [];
+  const tokens = new Set();
+  for (let index = 0; index <= value.length - 3 && tokens.size < 120; index += 1) tokens.add(hmac(value.slice(index, index + 3)));
+  return [...tokens];
+}
+
+function buildCardSearchIndex(content) {
+  const tokens = searchTokens(content);
+  return tokens.length ? '|' + tokens.join('|') + '|' : null;
+}
 
 async function getCardsByOrder(orderId) {
   const order = await prisma.order.findUnique({
@@ -60,6 +77,7 @@ async function batchImport(productId, cardContents, skipDuplicates = true) {
         productId,
         cardContentEncrypted: encrypt(contentTrimmed),
         cardContentHash: contentHash,
+        cardSearchIndex: buildCardSearchIndex(contentTrimmed),
         status: 'available',
       },
     });
@@ -85,7 +103,8 @@ async function buildEncryptedCardData(content, inventoryId = null) {
   return {
     cardContentEncrypted: encrypt(contentTrimmed),
     cardContentHash: contentHash,
+    cardSearchIndex: buildCardSearchIndex(contentTrimmed),
   };
 }
 
-module.exports = { getCardsByOrder, batchImport, buildEncryptedCardData };
+module.exports = { getCardsByOrder, batchImport, buildEncryptedCardData, buildCardSearchIndex, searchTokens };
