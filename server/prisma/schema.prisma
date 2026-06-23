@@ -98,6 +98,7 @@ model User {
   passwordHash  String          @map("password_hash")
   balanceCents  Int             @default(0) @map("balance_cents")
   status        String          @default("active")
+  emailVerifiedAt DateTime?     @map("email_verified_at")
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
   orders        Order[]
@@ -106,6 +107,22 @@ model User {
 
   @@index([status, createdAt])
   @@map("users")
+}
+
+model EmailVerification {
+  id         Int       @id @default(autoincrement())
+  email      String
+  purpose    String
+  codeHash   String    @map("code_hash")
+  attempts   Int       @default(0)
+  ip         String?
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([email, purpose, createdAt])
+  @@index([expiresAt])
+  @@map("email_verifications")
 }
 
 model TronWallet {

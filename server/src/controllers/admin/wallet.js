@@ -1,4 +1,4 @@
-const { Router } = require('express');
+﻿const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { z } = require('zod');
@@ -19,8 +19,8 @@ const creditSchema = z.object({ userId: z.number().int().positive(), amount: z.n
 router.get('/wallet/users', async (req, res, next) => {
   try {
     const query = String(req.query.query || '').trim().toLowerCase();
-    if (query.length < 2) return res.json({ items: [] });
-    const items = await prisma.user.findMany({ where: { email: { contains: query } }, orderBy: { createdAt: 'desc' }, take: 30, select: { id: true, email: true, balanceCents: true, status: true, createdAt: true } });
+    const where = query.length >= 2 ? { email: { contains: query } } : {};
+    const items = await prisma.user.findMany({ where, orderBy: { createdAt: 'desc' }, take: 50, select: { id: true, email: true, balanceCents: true, status: true, emailVerifiedAt: true, createdAt: true } });
     res.json({ items });
   } catch (err) { next(err); }
 });

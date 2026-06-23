@@ -1,5 +1,4 @@
-
-import axios from 'axios';
+﻿import axios from 'axios';
 
 const rawBaseURL = import.meta.env.VITE_API_BASE_URL || '/api';
 const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL.slice(0, -1) : rawBaseURL;
@@ -27,7 +26,10 @@ export const publicApi = {
   lookupOrder: (data) => api.post('/public/orders/lookup', data),
   getPaymentConfig: () => api.get('/public/payment/config'),
   createPayment: (data) => api.post('/public/payment/create', data),
+  checkPayment: (data) => api.post('/public/payment/check', data),
   submitOrderUsdtTx: (data) => api.post('/public/payment/usdt/submit-tx', data),
+  getEmailVerification: () => api.get('/public/auth/email-verification'),
+  sendEmailCode: (data) => api.post('/public/auth/email-code', data),
 };
 
 export const userApi = {
@@ -37,6 +39,7 @@ export const userApi = {
   getLedger: () => api.get('/public/auth/ledger'),
   createTopup: (data) => api.post('/public/topups', data),
   getTopup: (topUpNo) => api.get('/public/topups/' + topUpNo),
+  checkTopup: (topUpNo) => api.post('/public/topups/' + topUpNo + '/check'),
   submitTopupTx: (topUpNo, data) => api.post('/public/topups/' + topUpNo + '/submit-tx', data),
 };
 

@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 
 function splitList(value, fallback = []) {
   if (!value) return fallback;
@@ -69,6 +69,8 @@ module.exports = {
     provider: process.env.MAIL_PROVIDER || '',
     resendApiKey: process.env.RESEND_API_KEY || '',
     from: process.env.MAIL_FROM || '',
+    verificationRequired: process.env.MAIL_VERIFICATION_REQUIRED !== 'false',
+    codeTtlMinutes: parseInt(process.env.MAIL_CODE_TTL_MINUTES || '10', 10),
   },
   cardEncryptionKey: Buffer.from(cardEncryptionKeyHex, 'hex'),
   orderAccessPin: {

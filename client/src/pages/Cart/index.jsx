@@ -23,6 +23,9 @@ export default function Cart() {
   const [method, setMethod] = useState(null);
   const [rate, setRate] = useState(7);
   const [methods, setMethods] = useState([]);
+  const [emailVerification, setEmailVerification] = useState({ enabled: false, required: false });
+  const [emailCode, setEmailCode] = useState('');
+  const [codeSending, setCodeSending] = useState(false);
   const { accessToken, user, setUser } = useUserStore();
   const navigate = useNavigate();
   const total = getTotal();
@@ -33,7 +36,15 @@ export default function Cart() {
   }, [accessToken, user, setUser]);
 
   useEffect(() => {
-    publicApi.getPaymentConfig()
+    if (user?.email && !email) setEmail(user.email);
+  }, [user, email]);
+
+  useEffect(() => {
+    Promise.all([publicApi.getPaymentConfig(), publicApi.getEmailVerification().catch(() => ({ enabled: false, required: false }))])
+      .then(([data, verification]) => {
+        setEmailVerification(verification);
+        return data;
+      })
       .then((data) => {
         if (data.exchangeRate) setRate(data.exchangeRate);
         const activeMethods = Array.isArray(data.methods) ? data.methods : [];
@@ -43,6 +54,8 @@ export default function Cart() {
   }, []);
 
   const balanceEnough = Boolean(user && Number(user.balanceCents || 0) >= Math.round(total * 100));
+  const normalizedEmail = email.trim().toLowerCase();
+  const needsEmailCode = Boolean(emailVerification.required && (!user || normalizedEmail !== user.email));
   const availableMethods = useMemo(() => {
     const external = methods.filter((item) => item.method !== 'balance');
     return balanceEnough ? [{ method: 'balance', label: '余额支付' }, ...external] : external;
@@ -73,12 +86,13 @@ export default function Cart() {
 
   const submit = async () => {
     if (!email) return message.error('请输入邮箱');
+    if (needsEmailCode && !/^\d{6}$/.test(emailCode)) return message.error('请输入 6 位邮箱验证码');
     if (!/^\d{6}$/.test(pin)) return message.error('请输入 6 位查询密码');
     if (!items.length) return message.error('购物车为空');
     if (!method) return message.error(user ? '余额不足且当前没有外部支付方式，请联系客服' : '当前没有可用支付方式，请联系客服');
     setSubmitting(true);
     try {
-      const result = await publicApi.createOrder({ email, accessPin: pin, paymentMethod: method, items: getOrderItems() });
+      const result = await publicApi.createOrder({ email, emailCode: needsEmailCode ? emailCode : undefined, accessPin: pin, paymentMethod: method, items: getOrderItems() });
       if (method === 'balance' && user && result.balanceCents !== null) setUser({ ...user, balanceCents: result.balanceCents });
       setDone(result);
       clear();
@@ -87,6 +101,19 @@ export default function Cart() {
       message.error(err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const sendOrderCode = async () => {
+    if (!email) return message.warning('请先填写邮箱');
+    setCodeSending(true);
+    try {
+      await publicApi.sendEmailCode({ email, purpose: 'order' });
+      message.success('验证码已发送，请查看邮箱');
+    } catch (err) {
+      message.error(err.message);
+    } finally {
+      setCodeSending(false);
     }
   };
 
@@ -134,6 +161,9 @@ export default function Cart() {
             <Card title="下单信息" style={{ borderRadius: 18 }}>
               <Form layout="vertical" size="large" onFinish={submit}>
                 <Form.Item label="邮箱" required extra="用于查询订单和接收异常处理通知。"><Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder={user?.email || 'your@email.com'} /></Form.Item>
+                {needsEmailCode && <Form.Item label="邮箱验证码" required extra="验证下单邮箱归属，防止订单通知发送到错误邮箱。">
+                  <Space.Compact style={{ maxWidth: 360, width: '100%' }}><Input value={emailCode} onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6))} maxLength={6} placeholder="6 位验证码" /><Button loading={codeSending} onClick={sendOrderCode}>获取验证码</Button></Space.Compact>
+                </Form.Item>}
                 <Form.Item label="查询密码" required extra="6 位数字，请自行保存；支付后查看卡密需要验证。"><Input.Password prefix={<LockOutlined />} maxLength={6} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6 位数字" style={{ maxWidth: 260 }} /></Form.Item>
                 <Form.Item label="支付方式" required>
                   {availableMethods.length ? (

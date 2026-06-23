@@ -1,5 +1,4 @@
-
-import i18n from 'i18next';
+﻿import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 const zh = {
@@ -24,6 +23,30 @@ const zh = {
     footerBrand: '© 蓝域出海',
   },
   support: { button: '客服', title: '联系客服', text: '下单前后如需确认库存、支付或交付，请联系人工客服。' },
+  order: {
+    back: '返回商品',
+    pending: '待支付',
+    paid: '已支付',
+    cancelled: '已取消',
+    orderNo: '订单号',
+    amount: '金额',
+    status: '状态',
+    time: '创建时间',
+    payTime: '支付时间',
+    cards: '交付卡密',
+    copied: '已复制',
+    copy: '复制',
+    saveHint: '请及时保存交付内容，遇到异常可联系人工客服。',
+  },
+  lookup: {
+    title: '查询订单',
+    hint: '输入下单邮箱和 6 位查询密码，支付完成后可查看交付内容。',
+    email: '下单邮箱',
+    pin: '查询密码',
+    btn: '查询订单',
+    goods: '商品',
+    notPaid: '订单尚未支付，请先完成支付。',
+  },
 };
 
 const en = {
@@ -48,6 +71,30 @@ const en = {
     footerBrand: '© BlueReach',
   },
   support: { button: 'Support', title: 'Contact support', text: 'Contact support if you need help with stock, payment, or delivery.' },
+  order: {
+    back: 'Back to products',
+    pending: 'Pending payment',
+    paid: 'Paid',
+    cancelled: 'Cancelled',
+    orderNo: 'Order No.',
+    amount: 'Amount',
+    status: 'Status',
+    time: 'Created at',
+    payTime: 'Paid at',
+    cards: 'Delivered cards',
+    copied: 'Copied',
+    copy: 'Copy',
+    saveHint: 'Please save the delivered content. Contact support if anything is abnormal.',
+  },
+  lookup: {
+    title: 'Order lookup',
+    hint: 'Enter your order email and 6-digit lookup PIN to view delivery after payment.',
+    email: 'Order email',
+    pin: 'Lookup PIN',
+    btn: 'Lookup order',
+    goods: 'Goods',
+    notPaid: 'The order is not paid yet.',
+  },
 };
 
 i18n.use(initReactI18next).init({

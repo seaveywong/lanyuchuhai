@@ -1,13 +1,15 @@
-const { Router } = require('express');
+﻿const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const { z } = require('zod');
 const { PrismaClient } = require('@prisma/client');
+const config = require('../../config');
 const { validateBody } = require('../../middleware/validator');
 const { orderLimiter, lookupLimiter } = require('../../middleware/rateLimiter');
 const { optionalCustomerAuth } = require('../../middleware/auth');
 const orderService = require('../../services/order');
 const cardService = require('../../services/card');
 const { sendOrderEmail } = require('../../services/email');
+const emailVerification = require('../../services/emailVerification');
 const logger = require('../../utils/logger');
 
 const prisma = new PrismaClient();
@@ -15,6 +17,7 @@ const router = Router();
 const orderNoSchema = z.object({ orderNo: z.string().regex(/^(VT\d{6}[A-F0-9]{10}|FB\d{6}[A-Z0-9]{6})$/, '订单号格式不正确') });
 const createOrderSchema = z.object({
   email: z.string().email('请输入有效邮箱地址').transform((value) => value.toLowerCase().trim()),
+  emailCode: z.string().regex(/^\d{6}$/, '请输入 6 位邮箱验证码').optional(),
   accessPin: z.string().regex(/^\d{6}$/, '请设置 6 位数字查询密码'),
   paymentMethod: z.enum(['usdt_trc20', 'alipay', 'wechat', 'balance']).default('usdt_trc20'),
   items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().min(1).max(100).default(1) })).min(1).max(20),
@@ -22,9 +25,15 @@ const createOrderSchema = z.object({
 
 router.post('/orders', optionalCustomerAuth, orderLimiter, validateBody(createOrderSchema), async (req, res, next) => {
   try {
-    const { email, accessPin, paymentMethod, items } = req.body;
+    const { email, emailCode, accessPin, paymentMethod, items } = req.body;
     if (paymentMethod === 'balance' && !req.user) return res.status(401).json({ error: '余额支付需要先登录账户' });
-    const order = await orderService.createOrder({ email: paymentMethod === 'balance' ? req.user.email : email, accessPin, paymentMethod, items, userId: req.user?.id || null });
+    const orderEmail = paymentMethod === 'balance' ? req.user.email : email;
+    const needsEmailCode = emailVerification.isRequired() && (!req.user || orderEmail !== req.user.email);
+    if (needsEmailCode) {
+      if (!emailCode) return res.status(400).json({ error: '请先获取并填写邮箱验证码' });
+      await emailVerification.consumeEmailCode({ email: orderEmail, purpose: 'order', code: emailCode });
+    }
+    const order = await orderService.createOrder({ email: orderEmail, accessPin, paymentMethod, items, userId: req.user?.id || null });
     const balanceCents = paymentMethod === 'balance' ? (await prisma.user.findUnique({ where: { id: req.user.id }, select: { balanceCents: true } })).balanceCents : null;
     logger.info('Order created', { orderNo: order.orderNo, email: order.email });
     void sendOrderEmail(order.email, order.orderNo, order.status === 'paid').catch(() => undefined);
