@@ -15,11 +15,12 @@ async function appendLedger(tx, { userId, amountCents, type, orderId = null, adm
   if (!Number.isSafeInteger(amountCents) || amountCents === 0) throw new AppError('无效的余额变动', 400);
   const user = await tx.user.findUnique({ where: { id: userId } });
   if (!user || user.status !== 'active') throw new AppError('用户不存在或已停用', 404);
-  const balanceAfterCents = user.balanceCents + amountCents;
+  const balanceBeforeCents = user.balanceCents;
+  const balanceAfterCents = balanceBeforeCents + amountCents;
   if (balanceAfterCents < 0) throw new AppError('余额不足', 400);
   if (balanceAfterCents > MAX_BALANCE_CENTS) throw new AppError('余额超过账户上限', 400);
   await tx.user.update({ where: { id: user.id }, data: { balanceCents: balanceAfterCents } });
-  return tx.walletLedger.create({ data: { userId: user.id, orderId, adminId, amountCents, balanceAfterCents, type, note: note || null, reference: reference || crypto.randomUUID() } });
+  return tx.walletLedger.create({ data: { userId: user.id, orderId, adminId, amountCents, balanceBeforeCents, balanceAfterCents, type, note: note || null, reference: reference || crypto.randomUUID() } });
 }
 
 async function creditUser({ userId, amount, type, note, adminId }) {
@@ -27,4 +28,4 @@ async function creditUser({ userId, amount, type, note, adminId }) {
   return prisma.$transaction((tx) => appendLedger(tx, { userId, amountCents, type, note, adminId }));
 }
 
-module.exports = { appendLedger, creditUser };
+module.exports = { appendLedger, creditUser, toCents };

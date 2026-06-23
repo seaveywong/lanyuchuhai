@@ -58,6 +58,7 @@ export const adminApi = {
   batchDeleteInventory: (ids) => api.post('/admin/inventory/batch-delete', { ids }),
   getWalletUsers: (params) => api.get('/admin/wallet/users', { params }),
   getWalletLedger: () => api.get('/admin/wallet/ledger'),
+  verifyWalletCredit: (data) => api.post('/admin/wallet/verify-credit', data),
   creditWallet: (data) => api.post('/admin/wallet/credit', data),
   getOrders: (params) => api.get('/admin/orders', { params }),
   getOrderDetail: (id) => api.get('/admin/orders/' + id),

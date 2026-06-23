@@ -41,7 +41,7 @@ router.post('/auth/login', customerAuthLimiter, validateBody(credentialsSchema),
 router.get('/auth/me', customerAuth, (req, res) => res.json({ user: publicUser(req.user) }));
 router.get('/auth/ledger', customerAuth, async (req, res, next) => {
   try {
-    const entries = await prisma.walletLedger.findMany({ where: { userId: req.user.id }, orderBy: { createdAt: 'desc' }, take: 100, select: { id: true, amountCents: true, balanceAfterCents: true, type: true, note: true, createdAt: true, order: { select: { orderNo: true } } } });
+    const entries = await prisma.walletLedger.findMany({ where: { userId: req.user.id }, orderBy: { createdAt: 'desc' }, take: 100, select: { id: true, amountCents: true, balanceBeforeCents: true, balanceAfterCents: true, type: true, note: true, createdAt: true, order: { select: { orderNo: true } } } });
     res.json({ entries });
   } catch (err) { next(err); }
 });

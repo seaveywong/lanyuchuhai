@@ -110,6 +110,7 @@ model WalletLedger {
   adminId           Int?      @map("admin_id")
   admin             Admin?    @relation(fields: [adminId], references: [id])
   amountCents       Int       @map("amount_cents")
+  balanceBeforeCents Int      @map("balance_before_cents")
   balanceAfterCents Int       @map("balance_after_cents")
   type              String
   reference         String?   @unique
@@ -161,8 +162,23 @@ model Admin {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   walletLedgers WalletLedger[]
+  sensitiveActions AdminSensitiveAction[]
 
   @@map("admins")
+}
+
+model AdminSensitiveAction {
+  id        Int       @id @default(autoincrement())
+  adminId   Int       @map("admin_id")
+  admin     Admin     @relation(fields: [adminId], references: [id])
+  action    String
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([adminId, action, expiresAt])
+  @@map("admin_sensitive_actions")
 }
 
 model PaymentConfig {

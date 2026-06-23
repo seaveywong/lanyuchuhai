@@ -31,7 +31,7 @@ async function readInventoryWorkbook(file, skipFirstRow) {
   if (!file.name.toLowerCase().endsWith('.xlsx')) throw new Error('仅支持 .xlsx 文件，请将旧版 Excel 另存为 .xlsx 后导入');
   if (file.size > MAX_WORKBOOK_BYTES) throw new Error('Excel 文件不能超过 8MB');
 
-  const { default: readXlsxFile } = await import('read-excel-file');
+  const { default: readXlsxFile } = await import('read-excel-file/browser');
   const rows = await readXlsxFile(file);
   return rows
     .slice(skipFirstRow ? 1 : 0)
