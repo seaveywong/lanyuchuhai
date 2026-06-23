@@ -1,6 +1,60 @@
+
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-const zh={nav:{home:"首页",lookup:"查单",cart:"购物车"},hero:{title:"数字商品 即时交付",sub:"安全的自动化发卡平台，支持 USDT 链上支付，7×24 小时自动发货",cta:"浏览商品"},sell:{why:"我们的优势",items:[{t:"极速交付",d:"USDT 链上支付确认后即时自动发卡"},{t:"操作简单",d:"三步完成：选购商品、填写信息、扫码支付"},{t:"安全可靠",d:"卡密加密存储，支付成功自动解密交付"},{t:"多品类覆盖",d:"Facebook 账号、广告号、BM、Cookie 等全品类支持"}]},product:{all:"全部分类",instock:"有货",out:"缺货",add:"加入购物车",buy:"立即购买",search:"搜索商品"},cart:{title:"购物车",empty:"购物车是空的",go:"去选购",back:"返回商城",sum:"合计",info:"填写信息",email:"邮箱地址",emailHint:"用于查询订单",pin:"查询密码",pinHint:"设置6位数字密码用于查单",pinPlace:"6位数字",pay:"支付方式",submit:"提交订单",success:"下单成功",successMsg:"请尽快完成支付，支付后凭查询密码获取卡密",goPay:"去支付"},order:{title:"订单详情",back:"返回",paid:"支付成功",pending:"等待支付",cancelled:"已取消",orderNo:"订单号",amount:"金额",status:"状态",time:"下单时间",payTime:"支付时间",payMethod:"支付方式",payGuide:"USDT-TRC20 支付指引",transfer:"请转账",network:"网络",confirm:"到账后自动确认",verify:"验证身份",verifyHint:"输入邮箱和查询密码查看卡密",vEmail:"邮箱",vPin:"查询密码",vBtn:"验证并查看卡密",cards:"卡密内容",copy:"复制",copied:"已复制",saveHint:"请妥善保管，关闭后可通过查单页面重新获取"},lookup:{title:"查单",hint:"输入下单时的邮箱和6位查询密码",email:"邮箱",pin:"查询密码",btn:"查询",notPaid:"订单未支付，支付后重新查询即可获取卡密",goods:"商品"},footer:{copy:"蓝域出海 BlueReach Global",support:"客服",slogan:"支付即交付"},lang:"EN"};
-const en={nav:{home:"Home",lookup:"Lookup",cart:"Cart"},hero:{title:"Digital Goods, Instant Delivery",sub:"Secure automated delivery platform. USDT on-chain payment, 24/7 auto-fulfillment.",cta:"Browse Products"},sell:{why:"Why BlueReach",items:[{t:"Lightning Fast",d:"Instant auto-delivery upon on-chain payment confirmation"},{t:"Simple Process",d:"Three steps: pick products, fill info, scan to pay"},{t:"Bank-Grade Security",d:"Encrypted storage, auto-decryption on successful payment"},{t:"Multi-Category",d:"Facebook accounts, ad accounts, BM, cookies, tokens & more"}]},product:{all:"All",instock:"In Stock",out:"Sold Out",add:"Add to Cart",buy:"Buy Now",search:"Search"},cart:{title:"Cart",empty:"Your cart is empty",go:"Browse",back:"Back",sum:"Total",info:"Order Info",email:"Email",emailHint:"Used for order lookup",pin:"Access PIN",pinHint:"Set a 6-digit PIN for order lookup",pinPlace:"6 digits",pay:"Payment",submit:"Place Order",success:"Order Placed",successMsg:"Complete payment to receive your keys. Use your PIN to retrieve them.",goPay:"Pay Now"},order:{title:"Order Detail",back:"Back",paid:"Paid",pending:"Pending",cancelled:"Cancelled",orderNo:"Order No.",amount:"Amount",status:"Status",time:"Created",payTime:"Paid At",payMethod:"Method",payGuide:"USDT-TRC20 Payment",transfer:"Send",network:"Network",confirm:"Auto-confirms after on-chain confirmation",verify:"Verify",verifyHint:"Enter email and PIN to view keys",vEmail:"Email",vPin:"PIN",vBtn:"Verify & View",cards:"Keys",copy:"Copy",copied:"Copied",saveHint:"Keep safe. Retrieve anytime via the Lookup page with your email and PIN."},lookup:{title:"Lookup",hint:"Enter your order email and 6-digit PIN",email:"Email",pin:"PIN",btn:"Search",notPaid:"Order not yet paid. Check back after payment.",goods:"Items"},footer:{copy:"BlueReach Global",support:"Support",slogan:"Pay & Deliver"},lang:"中文"};
-i18n.use(initReactI18next).init({resources:{zh:{translation:zh},en:{translation:en}},lng:localStorage.getItem('lang')||'zh',fallbackLng:'zh',interpolation:{escapeValue:false}});
+
+const zh = {
+  lang: 'EN',
+  nav: { lookup: '查订单', cart: '购物车' },
+  home: {
+    subtitle: '账号资源自助下单',
+    title: '商品列表',
+    desc: '选择分类，加入购物车，下单后按订单状态自动交付。',
+    search: '搜索商品',
+    all: '全部',
+    allSub: '全部小类',
+    inStock: '有库存',
+    outStock: '缺货',
+    add: '加入购物车',
+    buy: '立即购买',
+    empty: '没有匹配商品',
+    fallbackDesc: '库存商品，下单后按订单状态交付。',
+    loadFail: '商品加载失败',
+    added: '已加入购物车',
+    noStock: '当前缺货',
+    footerBrand: '© 蓝域出海',
+  },
+  support: { button: '客服', title: '联系客服', text: '下单前后如需确认库存、支付或交付，请联系人工客服。' },
+};
+
+const en = {
+  lang: '中文',
+  nav: { lookup: 'Orders', cart: 'Cart' },
+  home: {
+    subtitle: 'Self-service account marketplace',
+    title: 'Products',
+    desc: 'Choose a category, add items to cart, and receive delivery based on order status.',
+    search: 'Search products',
+    all: 'All',
+    allSub: 'All subcategories',
+    inStock: 'In stock',
+    outStock: 'Out',
+    add: 'Add to cart',
+    buy: 'Buy now',
+    empty: 'No matching products',
+    fallbackDesc: 'Inventory item. Delivery follows order status.',
+    loadFail: 'Failed to load products',
+    added: 'Added to cart',
+    noStock: 'Out of stock',
+    footerBrand: '© BlueReach',
+  },
+  support: { button: 'Support', title: 'Contact support', text: 'Contact support if you need help with stock, payment, or delivery.' },
+};
+
+i18n.use(initReactI18next).init({
+  resources: { zh: { translation: zh }, en: { translation: en } },
+  lng: localStorage.getItem('lang') || 'zh',
+  fallbackLng: 'zh',
+  interpolation: { escapeValue: false },
+});
+
 export default i18n;

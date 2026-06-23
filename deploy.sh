@@ -1,130 +1,111 @@
 #!/bin/bash
-# 蓝域出海 BlueReach — VPS 一键部署脚本
-# 用法: chmod +x deploy.sh && sudo ./deploy.sh
+set -euo pipefail
 
-set -e
+APP_DIR=${APP_DIR:-/var/www/lanyuchuhai}
+APP_HOST=${APP_HOST:-lanyu888888.com}
+PORT=${PORT:-3000}
+SOURCE_DIR=${SOURCE_DIR:-$(pwd)}
+FRONTEND_ORIGIN=${FRONTEND_ORIGIN:-https://lanyu.one}
+BASE_URL=${BASE_URL:-https://${APP_HOST}}
+ADMIN_DEFAULT_USERNAME=${ADMIN_DEFAULT_USERNAME:-admin}
+ADMIN_DEFAULT_PASSWORD=${ADMIN_DEFAULT_PASSWORD:-$(openssl rand -base64 18 | tr -d '=+/ ' | cut -c1-18)}
+JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-$(openssl rand -hex 32)}
+JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-$(openssl rand -hex 32)}
+CARD_ENCRYPTION_KEY=${CARD_ENCRYPTION_KEY:-$(openssl rand -hex 32)}
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
+if [ "$EUID" -ne 0 ]; then echo "Run as root or sudo."; exit 1; fi
+if [ ! -d "$SOURCE_DIR/server" ]; then echo "SOURCE_DIR must contain server/."; exit 1; fi
 
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  蓝域出海 BlueReach 部署脚本${NC}"
-echo -e "${GREEN}========================================${NC}"
-
-# 检查是否为 root
-if [ "$EUID" -ne 0 ]; then
-  echo -e "${RED}请用 sudo 运行${NC}"
-  exit 1
-fi
-
-# 获取域名
-read -p "前端域名 (如 shop.example.com): " FRONTEND_DOMAIN
-read -p "API域名 (如 api.example.com): " API_DOMAIN
-
-# 更新系统
-echo ">>> 更新系统..."
-apt update && apt upgrade -y
-
-# 安装依赖
-echo ">>> 安装基础环境..."
-apt install -y nginx certbot python3-certbot-nginx nodejs npm
-
-# 安装 PM2
+apt-get update
+apt-get install -y ca-certificates curl gnupg nginx rsync openssl certbot python3-certbot-nginx
+NODE_MAJOR=$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)
+if ! command -v node >/dev/null 2>&1 || [ "$NODE_MAJOR" -lt 18 ]; then curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; apt-get install -y nodejs; fi
 npm i -g pm2
 
-# 创建目录
-APP_DIR=/var/www/bluereach
-mkdir -p $APP_DIR
+mkdir -p "$APP_DIR/server"
+rsync -a --delete "$SOURCE_DIR/server/" "$APP_DIR/server/" --exclude node_modules --exclude .env --exclude prisma/dev.db --exclude prod.db
 
-# 假定代码在当前目录的 server-src/ 和 client-dist/
-echo ">>> 部署代码..."
-cp -r server-src/* $APP_DIR/server/ 2>/dev/null || echo "请将 server-src/ 放到当前目录"
-cp -r client-dist $APP_DIR/ 2>/dev/null || echo "请将 client-dist/ 放到当前目录"
+if [ -f "$APP_DIR/server/.env" ]; then
+  OLD_ADMIN_PASSWORD=$(grep -E '^ADMIN_DEFAULT_PASSWORD=' "$APP_DIR/server/.env" | tail -1 | cut -d= -f2- || true)
+  OLD_JWT_ACCESS=$(grep -E '^JWT_ACCESS_SECRET=' "$APP_DIR/server/.env" | tail -1 | cut -d= -f2- || true)
+  OLD_JWT_REFRESH=$(grep -E '^JWT_REFRESH_SECRET=' "$APP_DIR/server/.env" | tail -1 | cut -d= -f2- || true)
+  OLD_CARD_KEY=$(grep -E '^CARD_ENCRYPTION_KEY=' "$APP_DIR/server/.env" | tail -1 | cut -d= -f2- || true)
+  [ -n "${OLD_ADMIN_PASSWORD:-}" ] && ADMIN_DEFAULT_PASSWORD="$OLD_ADMIN_PASSWORD"
+  [ -n "${OLD_JWT_ACCESS:-}" ] && JWT_ACCESS_SECRET="$OLD_JWT_ACCESS"
+  [ -n "${OLD_JWT_REFRESH:-}" ] && JWT_REFRESH_SECRET="$OLD_JWT_REFRESH"
+  [ -n "${OLD_CARD_KEY:-}" ] && CARD_ENCRYPTION_KEY="$OLD_CARD_KEY"
+fi
 
-cd $APP_DIR/server
-
-# 安装后端依赖
-npm install
-
-# 生成密钥
-echo ">>> 生成安全密钥..."
-JWT_ACCESS=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-JWT_REFRESH=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-CARD_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-
-# 写入 .env
-cat > .env << ENVEOF
+cat > "$APP_DIR/server/.env" <<ENVEOF
+APP_NAME="BlueReach"
 NODE_ENV=production
-PORT=3000
+PORT=${PORT}
+BASE_URL=${BASE_URL}
+CORS_ORIGINS=${FRONTEND_ORIGIN}
+TRUST_PROXY=1
+BODY_LIMIT=1mb
+CALLBACK_BODY_LIMIT=256kb
+ORDER_PIN_SALT_ROUNDS=10
 DATABASE_URL="file:./prod.db"
-CORS_ORIGINS=https://${FRONTEND_DOMAIN}
-JWT_ACCESS_SECRET=${JWT_ACCESS}
-JWT_REFRESH_SECRET=${JWT_REFRESH}
-CARD_ENCRYPTION_KEY=${CARD_KEY}
-ADMIN_DEFAULT_USERNAME=admin
-ADMIN_DEFAULT_PASSWORD=admin123
+JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+JWT_ACCESS_EXPIRES=15m
+JWT_REFRESH_EXPIRES=7d
+JWT_ISSUER=keygo-api
+JWT_AUDIENCE=keygo-admin
+CARD_ENCRYPTION_KEY=${CARD_ENCRYPTION_KEY}
+USDT_CONTRACT_ADDRESS=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
+MERCHANT_WALLET_ADDRESS=${MERCHANT_WALLET_ADDRESS:-}
+USDT_EXCHANGE_RATE=${USDT_EXCHANGE_RATE:-7}
+USDT_MIN_CONFIRMATIONS=19
+USDT_LOOKBACK_MINUTES=180
+ADMIN_DEFAULT_USERNAME=${ADMIN_DEFAULT_USERNAME}
+ADMIN_DEFAULT_PASSWORD=${ADMIN_DEFAULT_PASSWORD}
 ENVEOF
+chmod 600 "$APP_DIR/server/.env"
 
-echo -e "${RED}>>> 请编辑 .env 填写 USDT 配置:${NC}"
-echo "    nano $APP_DIR/server/.env"
-echo "    TRONGRID_API_KEY=..."
-echo "    MERCHANT_WALLET_ADDRESS=TRx..."
-
-# 初始化数据库
+cd "$APP_DIR/server"
+npm ci
 npx prisma generate
 npx prisma db push
 node prisma/seed.js
-
-# 启动后端
-pm2 start src/app.js --name bluereach -i 2
+pm2 delete bluereach >/dev/null 2>&1 || true
+pm2 start src/app.js --name bluereach --time --update-env
 pm2 save
-pm2 startup
+pm2 startup systemd -u root --hp /root >/dev/null || true
 
-# Nginx 配置
-cat > /etc/nginx/sites-available/bluereach << NGINXEOF
+cat > /etc/nginx/sites-available/bluereach <<NGINXEOF
 server {
     listen 80;
-    server_name ${API_DOMAIN};
-
-    # 前端静态文件
-    root ${APP_DIR}/client-dist;
-    index index.html;
-
-    location / {
-        try_files \$uri \$uri/ /index.html;
-    }
-
-    # API 代理
+    server_name ${APP_HOST};
+    client_max_body_size 2m;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    location = / { return 200 'BlueReach API'; add_header Content-Type text/plain; }
+    location = /health { proxy_pass http://127.0.0.1:${PORT}/api/health; }
     location /api/ {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:${PORT};
+        proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
+    location ~ /\.(?!well-known) { deny all; }
+    location ~* (\.env|package\.json|package-lock\.json)$ { deny all; }
+    location ~* /(prisma|node_modules|src)/ { deny all; }
 }
 NGINXEOF
-
-ln -sf /etc/nginx/sites-available/bluereach /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/bluereach /etc/nginx/sites-enabled/bluereach
 rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl reload nginx
+certbot --nginx -d "$APP_HOST" --non-interactive --agree-tos -m "admin@$APP_HOST" --redirect || true
 nginx -t && systemctl reload nginx
 
-# SSL
-certbot --nginx -d ${API_DOMAIN} --non-interactive --agree-tos -m admin@${API_DOMAIN} || true
-
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  部署完成！${NC}"
-echo -e "${GREEN}========================================${NC}"
-echo ""
-echo "前端: https://${API_DOMAIN}"
-echo "API:  https://${API_DOMAIN}/api/health"
-echo "后台: https://${API_DOMAIN}/admin/login"
-echo ""
-echo -e "${RED}重要：请立即执行以下操作：${NC}"
-echo "1. 编辑 .env: nano $APP_DIR/server/.env"
-echo "   - 填写 USDT 配置"
-echo "   - 修改 ADMIN_DEFAULT_PASSWORD"
-echo "2. 备份 CARD_ENCRYPTION_KEY: ${CARD_KEY}"
-echo "3. 到 Cloudflare 添加 DNS 记录，开启橙色云朵"
-echo "4. 在 Cloudflare WAF 中添加速率限制规则"
+echo "BACKEND_DEPLOY_OK"
+echo "API=https://${APP_HOST}/api/health"
+echo "CORS=${FRONTEND_ORIGIN}"
+echo "ADMIN_USER=${ADMIN_DEFAULT_USERNAME}"
+echo "ADMIN_PASSWORD=${ADMIN_DEFAULT_PASSWORD}"

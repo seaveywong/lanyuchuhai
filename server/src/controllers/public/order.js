@@ -7,74 +7,44 @@ const { orderLimiter, lookupLimiter } = require('../../middleware/rateLimiter');
 const orderService = require('../../services/order');
 const cardService = require('../../services/card');
 const logger = require('../../utils/logger');
-
 const prisma = new PrismaClient();
 const router = Router();
 
-const orderNoSchema = z.object({
-  orderNo: z.string().regex(/^(VT\d{6}[A-F0-9]{10}|FB\d{6}[A-Z0-9]{6})$/, '订单号格式不正确'),
-});
-
+const orderNoSchema = z.object({ orderNo: z.string().regex(/^(VT\d{6}[A-F0-9]{10}|FB\d{6}[A-Z0-9]{6})$/, '订单号格式不正确') });
 const createOrderSchema = z.object({
   email: z.string().email('请输入有效的邮箱地址').transform((v) => v.toLowerCase().trim()),
   accessPin: z.string().regex(/^\d{6}$/, '请设置6位数字查询密码'),
-  items: z.array(
-    z.object({
-      productId: z.number().int().positive('无效的商品ID'),
-      quantity: z.number().int().min(1).max(100).default(1),
-    })
-  ).min(1, '至少选择一个商品').max(20, '最多选择20个商品'),
+  paymentMethod: z.enum(['usdt_trc20', 'alipay', 'wechat']).default('usdt_trc20'),
+  items: z.array(z.object({ productId: z.number().int().positive('无效的商品ID'), quantity: z.number().int().min(1).max(100).default(1) })).min(1, '至少选择一个商品').max(20, '最多选择20个商品'),
 });
 
 router.post('/orders', orderLimiter, validateBody(createOrderSchema), async (req, res, next) => {
   try {
     const { email, accessPin, paymentMethod, items } = req.body;
-    const order = await orderService.createOrder(email, accessPin, paymentMethod || 'usdt_trc20', items);
-
+    const order = await orderService.createOrder(email, accessPin, paymentMethod, items);
     logger.info('Order created', { orderNo: order.orderNo, email: order.email });
-
     res.status(201).json({
       orderNo: order.orderNo,
       email: order.email,
       totalAmount: order.totalAmount.toString(),
       currency: order.currency,
       status: order.status,
-      items: order.items.map((i) => ({
-        productId: i.productId,
-        productName: i.product.name,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice.toString(),
-      })),
+      paymentMethod: order.paymentMethod,
+      items: order.items.map((i) => ({ productId: i.productId, productName: i.product.name, quantity: i.quantity, unitPrice: i.unitPrice.toString() })),
       createdAt: order.createdAt,
       message: '下单成功，请尽快完成支付',
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 router.get('/orders/:orderNo', lookupLimiter, async (req, res, next) => {
   try {
     const parsed = orderNoSchema.safeParse(req.params);
     if (!parsed.success) return res.status(400).json({ error: '订单号格式不正确' });
-
-    const order = await prisma.order.findUnique({
-      where: { orderNo: parsed.data.orderNo },
-      select: {
-        orderNo: true,
-        status: true,
-        totalAmount: true,
-        currency: true,
-        paymentMethod: true,
-        paidAt: true,
-        createdAt: true,
-      },
-    });
+    const order = await prisma.order.findUnique({ where: { orderNo: parsed.data.orderNo }, select: { orderNo: true, status: true, totalAmount: true, currency: true, paymentMethod: true, paidAt: true, createdAt: true } });
     if (!order) return res.status(404).json({ error: '订单不存在' });
     res.json(order);
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 const lookupSchema = z.object({
@@ -85,36 +55,14 @@ const lookupSchema = z.object({
 router.post('/orders/lookup', lookupLimiter, validateBody(lookupSchema), async (req, res, next) => {
   try {
     const { email, accessPin } = req.body;
-
-    const recentOrders = await prisma.order.findMany({
-      where: { email },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-      include: {
-        items: { include: { product: { select: { name: true } } } },
-        payments: true,
-      },
-    });
-
+    const recentOrders = await prisma.order.findMany({ where: { email }, orderBy: { createdAt: 'desc' }, take: 20, include: { items: { include: { product: { select: { name: true } } } }, payments: true } });
     let order = null;
     for (const candidate of recentOrders) {
-      const matched = candidate.accessPin.startsWith('$2')
-        ? await bcrypt.compare(accessPin, candidate.accessPin)
-        : candidate.accessPin === accessPin;
-      if (matched) {
-        order = candidate;
-        break;
-      }
+      const matched = candidate.accessPin.startsWith('$2') ? await bcrypt.compare(accessPin, candidate.accessPin) : candidate.accessPin === accessPin;
+      if (matched) { order = candidate; break; }
     }
-
-    if (!order) {
-      return res.status(404).json({ error: '未找到匹配的订单，请检查邮箱和查询密码' });
-    }
-
-    const cardContent = order.status === 'paid'
-      ? await cardService.getCardsByOrder(order.id)
-      : null;
-
+    if (!order) return res.status(404).json({ error: '未找到匹配的订单，请检查邮箱和查询密码' });
+    const cardContent = order.status === 'paid' ? await cardService.getCardsByOrder(order.id) : null;
     res.json({
       orderNo: order.orderNo,
       email: order.email,
@@ -124,16 +72,10 @@ router.post('/orders/lookup', lookupLimiter, validateBody(lookupSchema), async (
       paymentMethod: order.paymentMethod,
       paidAt: order.paidAt,
       createdAt: order.createdAt,
-      items: order.items.map((i) => ({
-        productName: i.product.name,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice.toString(),
-      })),
+      items: order.items.map((i) => ({ productName: i.product.name, quantity: i.quantity, unitPrice: i.unitPrice.toString() })),
       cards: cardContent,
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

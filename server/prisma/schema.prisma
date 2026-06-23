@@ -7,21 +7,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ========== 商品分类 ==========
 model Category {
-  id        Int       @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
+  parentId  Int?       @map("parent_id")
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
   name      String
-  slug      String    @unique
-  sortOrder Int       @default(0) @map("sort_order")
-  status    String    @default("active")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  slug      String     @unique
+  sortOrder Int        @default(0) @map("sort_order")
+  status    String     @default("active")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
   products  Product[]
 
+  @@index([parentId, sortOrder])
   @@map("categories")
 }
 
-// ========== 商品 (SPU) ==========
 model Product {
   id           Int         @id @default(autoincrement())
   categoryId   Int         @map("category_id")
@@ -42,7 +44,6 @@ model Product {
   @@map("products")
 }
 
-// ========== 库存卡密 (SKU) 核心安全表 ==========
 model Inventory {
   id                   Int        @id @default(autoincrement())
   productId            Int        @map("product_id")
@@ -59,7 +60,6 @@ model Inventory {
   @@map("inventory")
 }
 
-// ========== 订单 ==========
 model Order {
   id            Int         @id @default(autoincrement())
   orderNo       String      @unique @map("order_no")
@@ -81,7 +81,6 @@ model Order {
   @@map("orders")
 }
 
-// ========== 订单明细 ==========
 model OrderItem {
   id        Int        @id @default(autoincrement())
   orderId   Int        @map("order_id")
@@ -95,7 +94,6 @@ model OrderItem {
   @@map("order_items")
 }
 
-// ========== 支付记录 ==========
 model Payment {
   id          Int      @id @default(autoincrement())
   orderId     Int      @map("order_id")
@@ -114,7 +112,6 @@ model Payment {
   @@map("payments")
 }
 
-// ========== 管理员 ==========
 model Admin {
   id           Int       @id @default(autoincrement())
   username     String    @unique
@@ -127,7 +124,6 @@ model Admin {
   @@map("admins")
 }
 
-// ========== 支付配置 ==========
 model PaymentConfig {
   id         Int      @id @default(autoincrement())
   method     String   @unique
@@ -139,7 +135,6 @@ model PaymentConfig {
   @@map("payment_configs")
 }
 
-// ========== 操作审计日志 ==========
 model AuditLog {
   id        Int      @id @default(autoincrement())
   adminId   Int?     @map("admin_id")
@@ -152,7 +147,6 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-// ========== 登录失败记录（防爆破） ==========
 model LoginAttempt {
   id        Int      @id @default(autoincrement())
   ip        String
@@ -164,13 +158,12 @@ model LoginAttempt {
   @@map("login_attempts")
 }
 
-// ========== IP 黑名单 ==========
 model IpBlacklist {
-  id        Int      @id @default(autoincrement())
-  ip        String   @unique
-  reason    String
+  id           Int       @id @default(autoincrement())
+  ip           String    @unique
+  reason       String
   blockedUntil DateTime? @map("blocked_until")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   @@map("ip_blacklist")
 }

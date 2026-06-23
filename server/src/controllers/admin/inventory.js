@@ -1,6 +1,4 @@
-/**
- * 管理接口 — 库存（卡密）管理
- */
+
 const { Router } = require('express');
 const { z } = require('zod');
 const { PrismaClient } = require('@prisma/client');
@@ -14,92 +12,138 @@ const prisma = new PrismaClient();
 const router = Router();
 router.use(adminAuth, adminLimiter);
 
-// GET /api/admin/inventory?productId=&status=&page=1&limit=50
+const inventorySelect = {
+  id: true,
+  productId: true,
+  cardContentHash: true,
+  status: true,
+  orderItemId: true,
+  createdAt: true,
+  soldAt: true,
+  product: { select: { id: true, name: true, price: true, status: true } },
+};
+
+router.get('/inventory/stats', async (req, res, next) => {
+  try {
+    const stats = await prisma.inventory.groupBy({ by: ['status'], _count: true });
+    res.json(stats);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/inventory', async (req, res, next) => {
   try {
     const { productId, status, page = 1, limit = 50 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const take = Math.min(parseInt(limit), 200);
-
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    const take = Math.min(parseInt(limit, 10), 500);
     const where = {};
-    if (productId) where.productId = parseInt(productId);
+    if (productId) where.productId = parseInt(productId, 10);
     if (status) where.status = status;
 
     const [items, total] = await Promise.all([
-      prisma.inventory.findMany({
-        where,
-        select: {
-          id: true,
-          productId: true,
-          cardContentHash: true, // 只返回哈希，不返回卡密内容
-          cardContentEncrypted: false, // 管理列表也不返回加密内容
-          status: true,
-          orderItemId: true,
-          createdAt: true,
-          soldAt: true,
-          product: { select: { name: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take,
-      }),
+      prisma.inventory.findMany({ where, select: inventorySelect, orderBy: { createdAt: 'desc' }, skip, take }),
       prisma.inventory.count({ where }),
     ]);
 
     res.json({
-      items,
-      pagination: { page: parseInt(page), limit: take, total, totalPages: Math.ceil(total / take) },
+      items: items.map((item) => ({ ...item, shortHash: item.cardContentHash.slice(0, 12) })),
+      pagination: { page: parseInt(page, 10), limit: take, total, totalPages: Math.ceil(total / take) },
     });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/admin/inventory/batch-import — 批量导入卡密
 const importSchema = z.object({
   productId: z.number().int().positive(),
-  cards: z.array(z.string().min(1)).min(1, '至少导入一条').max(1000, '单次最多1000条'),
+  cards: z.array(z.string().min(1)).min(1, '至少导入一条').max(1000, '单次最多 1000 条'),
   skipDuplicates: z.boolean().default(true),
 });
 
 router.post('/inventory/batch-import', validateBody(importSchema), async (req, res, next) => {
   try {
     const { productId, cards, skipDuplicates } = req.body;
-
-    // 校验商品存在
     const product = await prisma.product.findUnique({ where: { id: productId } });
-    if (!product) {
-      return res.status(404).json({ error: '商品不存在' });
-    }
+    if (!product) return res.status(404).json({ error: '商品不存在' });
 
     const result = await cardService.batchImport(productId, cards, skipDuplicates);
-
-    logger.info('Inventory batch import', {
-      productId,
-      productName: product.name,
-      imported: result.imported,
-      skipped: result.skipped,
-      adminId: req.admin.id,
-    });
-
-    res.json({
-      message: `成功导入 ${result.imported} 条，跳过 ${result.skipped} 条重复`,
-      ...result,
-    });
+    logger.info('Inventory batch import', { productId, productName: product.name, imported: result.imported, skipped: result.skipped, adminId: req.admin.id });
+    res.json({ message: '成功导入 ' + result.imported + ' 条，跳过 ' + result.skipped + ' 条重复', ...result });
   } catch (err) {
     next(err);
   }
 });
 
-// GET /api/admin/inventory/stats — 库存统计
-router.get('/inventory/stats', async (req, res, next) => {
-  try {
-    const stats = await prisma.inventory.groupBy({
-      by: ['status'],
-      _count: true,
-    });
+const updateSchema = z.object({
+  productId: z.number().int().positive().optional(),
+  status: z.enum(['available', 'reserved']).optional(),
+  cardContent: z.string().trim().min(1).optional(),
+});
 
-    res.json(stats);
+router.put('/inventory/:id', validateBody(updateSchema), async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const current = await prisma.inventory.findUnique({ where: { id } });
+    if (!current) return res.status(404).json({ error: '库存不存在' });
+    if (current.status === 'sold') return res.status(400).json({ error: '已售出的库存不能修改' });
+
+    const data = {};
+    if (req.body.productId) {
+      const product = await prisma.product.findUnique({ where: { id: req.body.productId } });
+      if (!product) return res.status(404).json({ error: '商品不存在' });
+      data.productId = req.body.productId;
+    }
+    if (req.body.status) data.status = req.body.status;
+    if (req.body.cardContent) Object.assign(data, await cardService.buildEncryptedCardData(req.body.cardContent, id));
+
+    const item = await prisma.inventory.update({ where: { id }, data, select: inventorySelect });
+    logger.info('Inventory updated', { id, adminId: req.admin.id });
+    res.json({ ...item, shortHash: item.cardContentHash.slice(0, 12) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/inventory/:id', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const current = await prisma.inventory.findUnique({ where: { id } });
+    if (!current) return res.status(404).json({ error: '库存不存在' });
+    if (current.status === 'sold' || current.orderItemId) return res.status(400).json({ error: '已售出的库存不能删除' });
+
+    await prisma.inventory.delete({ where: { id } });
+    logger.info('Inventory deleted', { id, adminId: req.admin.id });
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const batchDeleteSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1, '请选择库存').max(500, '单次最多删除 500 条'),
+});
+
+router.post('/inventory/batch-delete', validateBody(batchDeleteSchema), async (req, res, next) => {
+  try {
+    const ids = Array.from(new Set(req.body.ids));
+    const rows = await prisma.inventory.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, status: true, orderItemId: true },
+    });
+    const deletableIds = rows.filter((item) => item.status !== 'sold' && !item.orderItemId).map((item) => item.id);
+    const skippedIds = rows.filter((item) => item.status === 'sold' || item.orderItemId).map((item) => item.id);
+
+    let deleted = 0;
+    if (deletableIds.length) {
+      const result = await prisma.inventory.deleteMany({
+        where: { id: { in: deletableIds }, status: { not: 'sold' }, orderItemId: null },
+      });
+      deleted = result.count;
+    }
+
+    logger.info('Inventory batch deleted', { requested: ids.length, deleted, skipped: skippedIds.length, adminId: req.admin.id });
+    res.json({ success: true, requested: ids.length, deleted, skipped: skippedIds.length, skippedIds });
   } catch (err) {
     next(err);
   }

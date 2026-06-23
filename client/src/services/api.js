@@ -1,34 +1,55 @@
+
 import axios from 'axios';
-const api=axios.create({baseURL:'/api',timeout:15000});
-api.interceptors.request.use(c=>{const t=localStorage.getItem('admin_token');if(t&&c.url?.startsWith('/admin'))c.headers.Authorization=`Bearer ${t}`;return c});
-api.interceptors.response.use(r=>r.data,e=>{const m=e.response?.data?.error||'Network error';return Promise.reject(new Error(m))});
-export const publicApi={
-  getProducts:p=>api.get('/public/products',{params:p}),
-  getProduct:id=>api.get(`/public/products/${id}`),
-  createOrder:d=>api.post('/public/orders',d),
-  getOrder:no=>api.get(`/public/orders/${no}`),
-  lookupOrder:d=>api.post('/public/orders/lookup',d),
-  getPaymentConfig:()=>api.get('/public/payment/config'),
-  createPayment:d=>api.post('/public/payment/create',d),
+
+const rawBaseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL.slice(0, -1) : rawBaseURL;
+const api = axios.create({ baseURL, timeout: 15000 });
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('admin_token');
+  if (token && config.url?.startsWith('/admin')) config.headers.Authorization = 'Bearer ' + token;
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response.data,
+  (error) => Promise.reject(new Error(error.response?.data?.error || 'Network error')),
+);
+
+export const publicApi = {
+  getProducts: (params) => api.get('/public/products', { params }),
+  getProduct: (id) => api.get('/public/products/' + id),
+  getCategories: () => api.get('/public/categories'),
+  createOrder: (data) => api.post('/public/orders', data),
+  getOrder: (orderNo) => api.get('/public/orders/' + orderNo),
+  lookupOrder: (data) => api.post('/public/orders/lookup', data),
+  getPaymentConfig: () => api.get('/public/payment/config'),
+  createPayment: (data) => api.post('/public/payment/create', data),
 };
-export const adminApi={
-  login:d=>api.post('/admin/login',d),
-  getMe:()=>api.get('/admin/me'),
-  changePassword:d=>api.post('/admin/change-password',d),
-  changeUsername:d=>api.post('/admin/change-username',d),
-  getDashboard:()=>api.get('/admin/dashboard'),
-  getProducts:p=>api.get('/admin/products',{params:p}),
-  createProduct:d=>api.post('/admin/products',d),
-  updateProduct:(id,d)=>api.put(`/admin/products/${id}`,d),
-  deleteProduct:id=>api.delete(`/admin/products/${id}`),
-  getCategories:()=>api.get('/admin/categories'),
-  createCategory:d=>api.post('/admin/categories',d),
-  getInventory:p=>api.get('/admin/inventory',{params:p}),
-  batchImport:d=>api.post('/admin/inventory/batch-import',d),
-  getOrders:p=>api.get('/admin/orders',{params:p}),
-  getOrderDetail:id=>api.get(`/admin/orders/${id}`),
-  cancelOrder:id=>api.post(`/admin/orders/${id}/cancel`),
-  confirmPayment:id=>api.post(`/admin/orders/${id}/confirm-payment`),
-  getPaymentConfigs:()=>api.get('/admin/payment-configs'),
-  savePaymentConfig:d=>api.post('/admin/payment-configs',d),
+
+export const adminApi = {
+  login: (data) => api.post('/admin/login', data),
+  getMe: () => api.get('/admin/me'),
+  changePassword: (data) => api.post('/admin/change-password', data),
+  changeUsername: (data) => api.post('/admin/change-username', data),
+  getDashboard: () => api.get('/admin/dashboard'),
+  getProducts: (params) => api.get('/admin/products', { params }),
+  createProduct: (data) => api.post('/admin/products', data),
+  updateProduct: (id, data) => api.put('/admin/products/' + id, data),
+  deleteProduct: (id) => api.delete('/admin/products/' + id),
+  getCategories: (params) => api.get('/admin/categories', { params }),
+  createCategory: (data) => api.post('/admin/categories', data),
+  updateCategory: (id, data) => api.put('/admin/categories/' + id, data),
+  deleteCategory: (id) => api.delete('/admin/categories/' + id),
+  getInventory: (params) => api.get('/admin/inventory', { params }),
+  batchImport: (data) => api.post('/admin/inventory/batch-import', data),
+  updateInventory: (id, data) => api.put('/admin/inventory/' + id, data),
+  deleteInventory: (id) => api.delete('/admin/inventory/' + id),
+  batchDeleteInventory: (ids) => api.post('/admin/inventory/batch-delete', { ids }),
+  getOrders: (params) => api.get('/admin/orders', { params }),
+  getOrderDetail: (id) => api.get('/admin/orders/' + id),
+  cancelOrder: (id) => api.post('/admin/orders/' + id + '/cancel'),
+  confirmPayment: (id) => api.post('/admin/orders/' + id + '/confirm-payment'),
+  getPaymentConfigs: () => api.get('/admin/payment-configs'),
+  savePaymentConfig: (data) => api.post('/admin/payment-configs', data),
 };

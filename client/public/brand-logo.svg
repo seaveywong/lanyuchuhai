@@ -1,0 +1,21 @@
+
+<svg width="190" height="56" viewBox="0 0 190 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mark" x1="4" y1="4" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8"/>
+      <stop offset="0.48" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <filter id="shadow" x="-24%" y="-24%" width="148%" height="148%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="7" stdDeviation="7" flood-color="#0F172A" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="7" y="7" width="42" height="42" rx="14" fill="url(#mark)"/>
+    <path d="M18 36C24.5 22.5 32.1 16.5 42 16.5C38.4 22.1 35.2 28.6 32.3 36H18Z" fill="white" fill-opacity="0.95"/>
+    <path d="M18.5 39H39.5" stroke="#BAE6FD" stroke-width="3.6" stroke-linecap="round"/>
+    <path d="M25 31H35.2" stroke="#DBEAFE" stroke-width="3.6" stroke-linecap="round"/>
+  </g>
+  <text x="62" y="27" fill="#0F172A" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="20" font-weight="850" letter-spacing="0.8">蓝域</text>
+  <text x="62" y="42" fill="#334155" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="9.5" font-weight="800" letter-spacing="3.1">BLUE REACH</text>
+</svg>

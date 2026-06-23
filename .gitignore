@@ -9,3 +9,10 @@ release/
 keygo-secure-platform-v3/
 keygo-secure-platform-v3.zip
 release/
+
+# local deployment/config artifacts
+.env.*
+client/.env.production
+client/cf_*.cjs
+*.tar.gz
+*_patch.cjs
