@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Badge, Button, Col, Empty, Input, Row, Spin, Tag, message } from 'antd';
+import { Badge, Button, Empty, Grid, Input, Spin, Tag, message } from 'antd';
 import { CustomerServiceOutlined, SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { publicApi } from '../../services/api';
 import { useCartStore } from '../../store/cartStore';
@@ -52,6 +52,7 @@ export default function Home() {
   const cartCount = useCartStore((state) => state.items.length);
   const addItem = useCartStore((state) => state.addItem);
   const isEn = i18n.language?.startsWith('en');
+  const screens = Grid.useBreakpoint();
 
   useEffect(() => {
     Promise.all([publicApi.getProducts({ limit: 200 }), publicApi.getCategories(), publicApi.getPaymentConfig()])
@@ -135,38 +136,34 @@ export default function Home() {
         ) : filteredProducts.length === 0 ? (
           <Empty style={{ padding: 80 }} description={t('home.empty')} />
         ) : (
-          <Row gutter={[16, 16]}>
+          <div style={{ display: 'grid', gap: 12 }}>
             {filteredProducts.map((product, index) => (
-              <Col key={product.id} xs={24} sm={12} lg={8} xl={6}>
-                <article style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, overflow: 'hidden', minHeight: 322, display: 'flex', flexDirection: 'column', boxShadow: '0 10px 26px rgba(15,23,42,.05)' }}>
-                  <div style={{ minHeight: 126, background: product.coverImage ? 'url(' + product.coverImage + ') center/cover' : 'linear-gradient(135deg,' + gradients[index % gradients.length] + ')', position: 'relative', padding: 12, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 'calc(100% - 76px)' }}>
-                        {product.category?.parent && <Tag color="default" style={{ marginInlineEnd: 0, maxWidth: 92, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label(product.category.parent)}</Tag>}
-                        <Tag color="blue" style={{ marginInlineEnd: 0, maxWidth: 132, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label(product.category || {})}</Tag>
-                      </div>
-                      <Tag color={product.hasStock ? 'green' : 'red'} style={{ marginInlineEnd: 0, flexShrink: 0 }}>{product.hasStock ? t('home.inStock') : t('home.outStock')}</Tag>
+              <article key={product.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden', display: 'grid', gridTemplateColumns: screens.md ? '8px minmax(0, 1fr) auto' : '6px minmax(0, 1fr)', boxShadow: '0 8px 20px rgba(15,23,42,.045)' }}>
+                <div aria-hidden="true" style={{ background: product.coverImage ? 'url(' + product.coverImage + ') center/cover' : 'linear-gradient(180deg,' + gradients[index % gradients.length] + ')' }} />
+                <div style={{ minWidth: 0, padding: screens.md ? '14px 0 14px 16px' : '14px 14px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
+                      {product.category?.parent && <Tag color="default" style={{ marginInlineEnd: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label(product.category.parent)}</Tag>}
+                      <Tag color="blue" style={{ marginInlineEnd: 0, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label(product.category || {})}</Tag>
                     </div>
-                    <div />
+                    <Tag color={product.hasStock ? 'green' : 'red'} style={{ marginInlineEnd: 0, flexShrink: 0 }}>{product.hasStock ? t('home.inStock') : t('home.outStock')}</Tag>
                   </div>
-                  <div style={{ padding: 16, display: 'flex', flexDirection: 'column', flex: 1 }}>
-                    <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>{label(product)}</h3>
-                    <p style={{ margin: '8px 0 14px', color: '#64748b', fontSize: 13, lineHeight: 1.6, minHeight: 42 }}>{(isEn && product.descriptionEn ? product.descriptionEn : product.description) || t('home.fallbackDesc')}</p>
-                    <div style={{ marginTop: 'auto' }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
-                        <strong style={{ fontSize: 22, color: '#0f172a' }}>¥{Number(product.price).toFixed(2)}</strong>
-                        <span style={{ color: '#94a3b8', fontSize: 12 }}>{cnyToUsdt(product.price, rate)} USDT</span>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        <Button disabled={!product.hasStock} onClick={() => addToCart(product)} style={{ borderRadius: 12 }}>{t('home.add')}</Button>
-                        <Button type="primary" disabled={!product.hasStock} onClick={() => buyNow(product)} style={{ borderRadius: 12 }}>{t('home.buy')}</Button>
-                      </div>
-                    </div>
+                  <h3 style={{ margin: '8px 0 0', fontSize: 16, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label(product)}</h3>
+                  <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 13, lineHeight: 1.6, display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden' }}>{(isEn && product.descriptionEn ? product.descriptionEn : product.description) || t('home.fallbackDesc')}</p>
+                </div>
+                <div style={{ gridColumn: screens.md ? 'auto' : '2', minWidth: 0, width: screens.md ? 310 : 'auto', padding: screens.md ? '14px 16px' : '12px 14px 14px', display: 'flex', alignItems: screens.md ? 'center' : 'stretch', justifyContent: 'space-between', gap: 14, borderLeft: screens.md ? '1px solid #eef2f7' : 'none' }}>
+                  <div style={{ whiteSpace: 'nowrap' }}>
+                    <strong style={{ display: 'block', fontSize: 21, color: '#0f172a', lineHeight: 1.2 }}>¥{Number(product.price).toFixed(2)}</strong>
+                    <span style={{ color: '#94a3b8', fontSize: 12 }}>{cnyToUsdt(product.price, rate)} USDT</span>
                   </div>
-                </article>
-              </Col>
+                  <div style={{ display: 'flex', gap: 8, flex: screens.md ? 0 : 1 }}>
+                    <Button disabled={!product.hasStock} onClick={() => addToCart(product)} style={{ borderRadius: 10, minWidth: screens.md ? 104 : 0, flex: screens.md ? 0 : 1 }}>{t('home.add')}</Button>
+                    <Button type="primary" disabled={!product.hasStock} onClick={() => buyNow(product)} style={{ borderRadius: 10, minWidth: screens.md ? 104 : 0, flex: screens.md ? 0 : 1 }}>{t('home.buy')}</Button>
+                  </div>
+                </div>
+              </article>
             ))}
-          </Row>
+          </div>
         )}
       </main>
 
