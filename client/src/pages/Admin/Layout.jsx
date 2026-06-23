@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Layout, Menu, Button, Dropdown, message, Typography } from 'antd';
-import { DashboardOutlined, ShoppingOutlined, DatabaseOutlined, OrderedListOutlined, SettingOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import { DashboardOutlined, ShoppingOutlined, DatabaseOutlined, OrderedListOutlined, SettingOutlined, LogoutOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 import { adminApi } from '../../services/api';
 
@@ -12,6 +12,7 @@ const adminSurface = import.meta.env.VITE_APP_SURFACE === 'admin';
 const path = (value) => (adminSurface ? value : '/admin' + value);
 
 const menuItems = [
+  { key: path('/wallet'), icon: <WalletOutlined />, label: '用户与余额' },
   { key: path('/dashboard'), icon: <DashboardOutlined />, label: '数据看板' },
   { key: path('/products'), icon: <ShoppingOutlined />, label: '商品与分类' },
   { key: path('/inventory'), icon: <DatabaseOutlined />, label: '库存工作台' },

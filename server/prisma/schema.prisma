@@ -63,6 +63,8 @@ model Inventory {
 
 model Order {
   id            Int         @id @default(autoincrement())
+  userId        Int?        @map("user_id")
+  user          User?       @relation(fields: [userId], references: [id])
   orderNo       String      @unique @map("order_no")
   email         String
   accessPin     String      @map("access_pin")
@@ -76,10 +78,47 @@ model Order {
   updatedAt     DateTime    @updatedAt @map("updated_at")
   items         OrderItem[]
   payments      Payment[]
+  walletLedgers WalletLedger[]
 
   @@index([email, createdAt])
   @@index([status, createdAt])
+  @@index([userId, createdAt])
   @@map("orders")
+}
+
+model User {
+  id            Int             @id @default(autoincrement())
+  email         String          @unique
+  passwordHash  String          @map("password_hash")
+  balanceCents  Int             @default(0) @map("balance_cents")
+  status        String          @default("active")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  orders        Order[]
+  walletLedgers WalletLedger[]
+
+  @@index([status, createdAt])
+  @@map("users")
+}
+
+model WalletLedger {
+  id                Int       @id @default(autoincrement())
+  userId            Int       @map("user_id")
+  user              User      @relation(fields: [userId], references: [id])
+  orderId           Int?      @map("order_id")
+  order             Order?    @relation(fields: [orderId], references: [id])
+  adminId           Int?      @map("admin_id")
+  admin             Admin?    @relation(fields: [adminId], references: [id])
+  amountCents       Int       @map("amount_cents")
+  balanceAfterCents Int       @map("balance_after_cents")
+  type              String
+  reference         String?   @unique
+  note              String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([orderId])
+  @@map("wallet_ledgers")
 }
 
 model OrderItem {
@@ -121,6 +160,7 @@ model Admin {
   lastLogin    DateTime? @map("last_login")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
+  walletLedgers WalletLedger[]
 
   @@map("admins")
 }

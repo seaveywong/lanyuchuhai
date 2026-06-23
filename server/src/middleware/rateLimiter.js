@@ -44,4 +44,12 @@ const adminLoginLimiter = rateLimit({
   message: { error: '登录尝试过于频繁，请稍后再试', code: 'LOGIN_RATE_LIMITED' },
 });
 
-module.exports = { apiLimiter, orderLimiter, lookupLimiter, adminLimiter, adminLoginLimiter };
+const customerAuthLimiter = rateLimit({
+  ...commonOptions,
+  windowMs: 15 * 60 * 1000,
+  max: isDev ? 80 : 12,
+  skipSuccessfulRequests: true,
+  message: { error: '账户操作过于频繁，请稍后再试', code: 'CUSTOMER_AUTH_RATE_LIMITED' },
+});
+
+module.exports = { apiLimiter, orderLimiter, lookupLimiter, adminLimiter, adminLoginLimiter, customerAuthLimiter };

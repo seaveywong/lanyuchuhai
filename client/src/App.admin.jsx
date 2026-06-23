@@ -9,6 +9,7 @@ const AdminProducts = lazy(() => import('./pages/Admin/Products'));
 const AdminInventory = lazy(() => import('./pages/Admin/Inventory'));
 const AdminOrders = lazy(() => import('./pages/Admin/Orders'));
 const AdminSettings = lazy(() => import('./pages/Admin/Settings'));
+const AdminWallet = lazy(() => import('./pages/Admin/Wallet'));
 const AdminLayout = lazy(() => import('./pages/Admin/Layout'));
 
 const theme = {
@@ -52,6 +53,7 @@ function AdminSurface() {
         <Route path="inventory" element={<AdminInventory />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="settings" element={<AdminSettings />} />
+        <Route path="wallet" element={<AdminWallet />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -17,12 +17,14 @@ const nodeEnv = process.env.NODE_ENV || 'development';
 const isProduction = nodeEnv === 'production';
 const jwtAccessSecret = process.env.JWT_ACCESS_SECRET || 'dev-access-secret';
 const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret';
+const customerJwtSecret = process.env.CUSTOMER_JWT_SECRET || 'dev-customer-access-secret';
 const cardEncryptionKeyHex = process.env.CARD_ENCRYPTION_KEY || 'a'.repeat(64);
 const adminDefaultPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'admin123';
 
 if (isProduction) {
   requireProductionSecret('JWT_ACCESS_SECRET', jwtAccessSecret, ['dev-', 'change-me']);
   requireProductionSecret('JWT_REFRESH_SECRET', jwtRefreshSecret, ['dev-', 'change-me']);
+  requireProductionSecret('CUSTOMER_JWT_SECRET', customerJwtSecret, ['dev-', 'change-me']);
   if (!/^[a-f0-9]{64}$/i.test(cardEncryptionKeyHex)) {
     throw new Error('CARD_ENCRYPTION_KEY must be 64 hex characters in production');
   }
@@ -58,6 +60,15 @@ module.exports = {
     refreshExpires: process.env.JWT_REFRESH_EXPIRES || '7d',
     issuer: process.env.JWT_ISSUER || 'keygo-api',
     audience: process.env.JWT_AUDIENCE || 'keygo-admin',
+  },
+  customerJwt: {
+    secret: customerJwtSecret,
+    expires: process.env.CUSTOMER_JWT_EXPIRES || '7d',
+  },
+  email: {
+    provider: process.env.MAIL_PROVIDER || '',
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    from: process.env.MAIL_FROM || '',
   },
   cardEncryptionKey: Buffer.from(cardEncryptionKeyHex, 'hex'),
   orderAccessPin: {

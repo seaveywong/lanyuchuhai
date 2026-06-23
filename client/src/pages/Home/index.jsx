@@ -103,6 +103,7 @@ export default function Home() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             <LangSwitch />
             <Link to="/lookup" style={{ color: '#475569', fontWeight: 700 }}>{t('nav.lookup')}</Link>
+            <Link to="/account" style={{ color: '#475569', fontWeight: 700 }}>账户</Link>
             <Badge count={cartCount} size="small"><Button icon={<ShoppingCartOutlined />} onClick={() => navigate('/cart')} style={{ borderRadius: 12 }}>{t('nav.cart')}</Button></Badge>
           </div>
         </div>
@@ -170,7 +171,6 @@ export default function Home() {
       <footer style={{ borderTop: '1px solid #e2e8f0', background: '#fff', padding: 20, color: '#94a3b8', fontSize: 12 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}><span>{t('home.footerBrand')}</span></div>
       </footer>
-      <SupportWidget contact={contact} />
     </div>
   );
 }

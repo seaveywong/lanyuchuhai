@@ -4,36 +4,36 @@ const { z } = require('zod');
 const { PrismaClient } = require('@prisma/client');
 const { validateBody } = require('../../middleware/validator');
 const { orderLimiter, lookupLimiter } = require('../../middleware/rateLimiter');
+const { optionalCustomerAuth } = require('../../middleware/auth');
 const orderService = require('../../services/order');
 const cardService = require('../../services/card');
+const { sendOrderEmail } = require('../../services/email');
 const logger = require('../../utils/logger');
+
 const prisma = new PrismaClient();
 const router = Router();
-
 const orderNoSchema = z.object({ orderNo: z.string().regex(/^(VT\d{6}[A-F0-9]{10}|FB\d{6}[A-Z0-9]{6})$/, '订单号格式不正确') });
 const createOrderSchema = z.object({
-  email: z.string().email('请输入有效的邮箱地址').transform((v) => v.toLowerCase().trim()),
-  accessPin: z.string().regex(/^\d{6}$/, '请设置6位数字查询密码'),
-  paymentMethod: z.enum(['usdt_trc20', 'alipay', 'wechat']).default('usdt_trc20'),
-  items: z.array(z.object({ productId: z.number().int().positive('无效的商品ID'), quantity: z.number().int().min(1).max(100).default(1) })).min(1, '至少选择一个商品').max(20, '最多选择20个商品'),
+  email: z.string().email('请输入有效的邮箱地址').transform((value) => value.toLowerCase().trim()),
+  accessPin: z.string().regex(/^\d{6}$/, '请设置 6 位数字查询密码'),
+  paymentMethod: z.enum(['usdt_trc20', 'alipay', 'wechat', 'balance']).default('usdt_trc20'),
+  items: z.array(z.object({ productId: z.number().int().positive(), quantity: z.number().int().min(1).max(100).default(1) })).min(1).max(20),
 });
 
-router.post('/orders', orderLimiter, validateBody(createOrderSchema), async (req, res, next) => {
+router.post('/orders', optionalCustomerAuth, orderLimiter, validateBody(createOrderSchema), async (req, res, next) => {
   try {
     const { email, accessPin, paymentMethod, items } = req.body;
-    const order = await orderService.createOrder(email, accessPin, paymentMethod, items);
+    if (paymentMethod === 'balance' && !req.user) return res.status(401).json({ error: '余额支付需要先登录账户' });
+    let order = await orderService.createOrder({ email: paymentMethod === 'balance' ? req.user.email : email, accessPin, paymentMethod, items, userId: req.user?.id || null });
+    let balanceCents = null;
+    if (paymentMethod === 'balance') {
+      const paid = await orderService.payWithBalance(req.user.id, order.id);
+      order = paid.order;
+      balanceCents = paid.balanceCents;
+    }
     logger.info('Order created', { orderNo: order.orderNo, email: order.email });
-    res.status(201).json({
-      orderNo: order.orderNo,
-      email: order.email,
-      totalAmount: order.totalAmount.toString(),
-      currency: order.currency,
-      status: order.status,
-      paymentMethod: order.paymentMethod,
-      items: order.items.map((i) => ({ productId: i.productId, productName: i.product.name, quantity: i.quantity, unitPrice: i.unitPrice.toString() })),
-      createdAt: order.createdAt,
-      message: '下单成功，请尽快完成支付',
-    });
+    void sendOrderEmail(order.email, order.orderNo, order.status === 'paid').catch(() => undefined);
+    res.status(201).json({ orderNo: order.orderNo, email: order.email, totalAmount: order.totalAmount.toString(), currency: order.currency, status: order.status, paymentMethod: order.paymentMethod, items: order.items.map((item) => ({ productId: item.productId, productName: item.product.name, quantity: item.quantity, unitPrice: item.unitPrice.toString() })), createdAt: order.createdAt, balanceCents, message: order.status === 'paid' ? '订单已支付并自动交付' : '下单成功，请尽快完成支付' });
   } catch (err) { next(err); }
 });
 
@@ -47,11 +47,7 @@ router.get('/orders/:orderNo', lookupLimiter, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-const lookupSchema = z.object({
-  email: z.string().email('请输入有效的邮箱地址').transform((v) => v.toLowerCase().trim()),
-  accessPin: z.string().regex(/^\d{6}$/, '请输入6位数字查询密码'),
-});
-
+const lookupSchema = z.object({ email: z.string().email().transform((value) => value.toLowerCase().trim()), accessPin: z.string().regex(/^\d{6}$/) });
 router.post('/orders/lookup', lookupLimiter, validateBody(lookupSchema), async (req, res, next) => {
   try {
     const { email, accessPin } = req.body;
@@ -63,18 +59,7 @@ router.post('/orders/lookup', lookupLimiter, validateBody(lookupSchema), async (
     }
     if (!order) return res.status(404).json({ error: '未找到匹配的订单，请检查邮箱和查询密码' });
     const cardContent = order.status === 'paid' ? await cardService.getCardsByOrder(order.id) : null;
-    res.json({
-      orderNo: order.orderNo,
-      email: order.email,
-      status: order.status,
-      totalAmount: order.totalAmount.toString(),
-      currency: order.currency,
-      paymentMethod: order.paymentMethod,
-      paidAt: order.paidAt,
-      createdAt: order.createdAt,
-      items: order.items.map((i) => ({ productName: i.product.name, quantity: i.quantity, unitPrice: i.unitPrice.toString() })),
-      cards: cardContent,
-    });
+    res.json({ orderNo: order.orderNo, email: order.email, status: order.status, totalAmount: order.totalAmount.toString(), currency: order.currency, paymentMethod: order.paymentMethod, paidAt: order.paidAt, createdAt: order.createdAt, items: order.items.map((item) => ({ productName: item.product.name, quantity: item.quantity, unitPrice: item.unitPrice.toString() })), cards: cardContent });
   } catch (err) { next(err); }
 });
 

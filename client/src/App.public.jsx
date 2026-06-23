@@ -1,11 +1,13 @@
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, Spin } from 'antd';
+import SupportWidget from './components/SupportWidget';
 
 const Home = lazy(() => import('./pages/Home'));
 const Cart = lazy(() => import('./pages/Cart'));
 const Order = lazy(() => import('./pages/Order'));
 const Lookup = lazy(() => import('./pages/Lookup'));
+const Account = lazy(() => import('./pages/Account'));
 
 const theme = {
   token: {
@@ -31,6 +33,7 @@ function PublicSurface() {
       <Route path="/cart" element={<Cart />} />
       <Route path="/order/:orderNo" element={<Order />} />
       <Route path="/lookup" element={<Lookup />} />
+      <Route path="/account" element={<Account />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -41,6 +44,7 @@ export default function App() {
     <ConfigProvider theme={theme}>
       <Suspense fallback={fallback}>
         <PublicSurface />
+        <SupportWidget />
       </Suspense>
     </ConfigProvider>
   );

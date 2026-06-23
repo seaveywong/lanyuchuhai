@@ -8,6 +8,8 @@ const api = axios.create({ baseURL, timeout: 15000 });
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('admin_token');
   if (token && config.url?.startsWith('/admin')) config.headers.Authorization = 'Bearer ' + token;
+  const customerToken = localStorage.getItem('customer_token');
+  if (customerToken && config.url?.startsWith('/public')) config.headers.Authorization = 'Bearer ' + customerToken;
   return config;
 });
 
@@ -25,6 +27,13 @@ export const publicApi = {
   lookupOrder: (data) => api.post('/public/orders/lookup', data),
   getPaymentConfig: () => api.get('/public/payment/config'),
   createPayment: (data) => api.post('/public/payment/create', data),
+};
+
+export const userApi = {
+  register: (data) => api.post('/public/auth/register', data),
+  login: (data) => api.post('/public/auth/login', data),
+  getMe: () => api.get('/public/auth/me'),
+  getLedger: () => api.get('/public/auth/ledger'),
 };
 
 export const adminApi = {
@@ -47,6 +56,9 @@ export const adminApi = {
   updateInventory: (id, data) => api.put('/admin/inventory/' + id, data),
   deleteInventory: (id) => api.delete('/admin/inventory/' + id),
   batchDeleteInventory: (ids) => api.post('/admin/inventory/batch-delete', { ids }),
+  getWalletUsers: (params) => api.get('/admin/wallet/users', { params }),
+  getWalletLedger: () => api.get('/admin/wallet/ledger'),
+  creditWallet: (data) => api.post('/admin/wallet/credit', data),
   getOrders: (params) => api.get('/admin/orders', { params }),
   getOrderDetail: (id) => api.get('/admin/orders/' + id),
   cancelOrder: (id) => api.post('/admin/orders/' + id + '/cancel'),

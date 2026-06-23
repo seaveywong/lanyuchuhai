@@ -46,4 +46,34 @@ async function adminAuth(req, res, next) {
   }
 }
 
-module.exports = { adminAuth };
+async function resolveCustomer(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.slice('Bearer '.length).trim();
+  const decoded = jwt.verify(token, config.customerJwt.secret, {
+    algorithms: ['HS256'],
+    issuer: config.jwt.issuer,
+    audience: 'bluereach-customer',
+  });
+  if (decoded.type !== 'customer') return null;
+  return prisma.user.findUnique({ where: { id: decoded.id }, select: { id: true, email: true, balanceCents: true, status: true, createdAt: true } });
+}
+
+async function customerAuth(req, res, next) {
+  try {
+    const user = await resolveCustomer(req);
+    if (!user || user.status !== 'active') return res.status(401).json({ error: '请先登录账户' });
+    req.user = user;
+    next();
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') return res.status(401).json({ error: '登录已过期，请重新登录' });
+    return res.status(401).json({ error: '无效的账户凭证' });
+  }
+}
+
+async function optionalCustomerAuth(req, res, next) {
+  if (!req.headers.authorization?.startsWith('Bearer ')) return next();
+  return customerAuth(req, res, next);
+}
+
+module.exports = { adminAuth, customerAuth, optionalCustomerAuth };

@@ -3,13 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, Descriptions, Empty, Form, Input, InputNumber, Popconfirm, Radio, Result, Space, Table, Tag, message } from 'antd';
 import { ArrowLeftOutlined, DeleteOutlined, LockOutlined, ShoppingOutlined } from '@ant-design/icons';
 import { useCartStore } from '../../store/cartStore';
-import { publicApi } from '../../services/api';
+import { publicApi, userApi } from '../../services/api';
 import { cnyToUsdt } from '../../utils/format';
+import { useUserStore } from '../../store/userStore';
 
 const methodFallback = {
   usdt_trc20: 'USDT-TRC20',
   alipay: '支付宝',
   wechat: '微信支付',
+  balance: '余额支付',
 };
 
 export default function Cart() {
@@ -21,9 +23,14 @@ export default function Cart() {
   const [method, setMethod] = useState(null);
   const [rate, setRate] = useState(7);
   const [methods, setMethods] = useState([]);
+  const { accessToken, user, setUser } = useUserStore();
   const navigate = useNavigate();
   const total = getTotal();
   const usdt = cnyToUsdt(total, rate);
+
+  useEffect(() => {
+    if (accessToken && !user) userApi.getMe().then((data) => setUser(data.user)).catch(() => undefined);
+  }, [accessToken, user, setUser]);
 
   useEffect(() => {
     publicApi.getPaymentConfig()
@@ -31,12 +38,13 @@ export default function Cart() {
         if (data.exchangeRate) setRate(data.exchangeRate);
         const activeMethods = Array.isArray(data.methods) ? data.methods : [];
         setMethods(activeMethods);
-        setMethod((current) => (activeMethods.some((item) => item.method === current) ? current : activeMethods[0]?.method || null));
       })
       .catch(() => setMethods([]));
   }, []);
 
-  const methodMap = useMemo(() => new Map(methods.map((item) => [item.method, item.label || methodFallback[item.method] || item.method])), [methods]);
+  const availableMethods = useMemo(() => [...methods, ...(user && Number(user.balanceCents || 0) >= Math.round(total * 100) ? [{ method: 'balance', label: '余额支付' }] : [])], [methods, user, total]);
+  useEffect(() => { setMethod((current) => (availableMethods.some((item) => item.method === current) ? current : availableMethods[0]?.method || null)); }, [availableMethods]);
+  const methodMap = useMemo(() => new Map(availableMethods.map((item) => [item.method, item.label || methodFallback[item.method] || item.method])), [availableMethods]);
 
   const columns = [
     {
@@ -58,10 +66,11 @@ export default function Cart() {
     if (!email) return message.error('请输入邮箱');
     if (!/^\d{6}$/.test(pin)) return message.error('请输入 6 位查询密码');
     if (!items.length) return message.error('购物车为空');
-    if (!method) return message.error('当前没有可用支付方式，请联系客服');
+    if (!method) return message.error(user ? '余额不足且当前没有外部支付方式，请联系客服' : '当前没有可用支付方式，请联系客服');
     setSubmitting(true);
     try {
       const result = await publicApi.createOrder({ email, accessPin: pin, paymentMethod: method, items: getOrderItems() });
+      if (method === 'balance' && user && result.balanceCents !== null) setUser({ ...user, balanceCents: result.balanceCents });
       setDone(result);
       clear();
       message.success('订单已创建');
@@ -76,14 +85,14 @@ export default function Cart() {
     return (
       <div style={{ minHeight: '100vh', background: '#f6f8fb', padding: 24 }}>
         <Card style={{ maxWidth: 620, margin: '40px auto', borderRadius: 18 }}>
-          <Result status="success" title="订单已创建" subTitle="请进入订单页完成支付，并保存订单号与查询密码。" />
+          <Result status="success" title={done.status === 'paid' ? '订单已支付' : '订单已创建'} subTitle={done.status === 'paid' ? '余额已扣除，订单已自动交付。请保存订单号与查询密码。' : '请进入订单页完成支付，并保存订单号与查询密码。'} />
           <Descriptions column={1} bordered size="small" style={{ marginBottom: 18 }}>
             <Descriptions.Item label="订单号"><code>{done.orderNo}</code></Descriptions.Item>
             <Descriptions.Item label="订单金额"><strong style={{ color: '#dc2626', fontSize: 18 }}>¥{Number(done.totalAmount).toFixed(2)}</strong></Descriptions.Item>
             <Descriptions.Item label="支付方式">{methodMap.get(done.paymentMethod) || done.paymentMethod}</Descriptions.Item>
           </Descriptions>
           <Space style={{ width: '100%', justifyContent: 'center' }}>
-            <Button type="primary" size="large" onClick={() => navigate(`/order/${done.orderNo}`)}>去支付</Button>
+            <Button type="primary" size="large" onClick={() => navigate(`/order/${done.orderNo}`)}>{done.status === 'paid' ? '查看订单' : '去支付'}</Button>
             <Button size="large" onClick={() => navigate('/')}>继续选购</Button>
           </Space>
         </Card>
@@ -115,12 +124,12 @@ export default function Cart() {
             </Card>
             <Card title="下单信息" style={{ borderRadius: 18 }}>
               <Form layout="vertical" size="large" onFinish={submit}>
-                <Form.Item label="邮箱" required extra="用于查询订单和接收异常处理通知。"><Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="your@email.com" /></Form.Item>
+                <Form.Item label="邮箱" required extra="用于查询订单和接收异常处理通知。"><Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder={user?.email || 'your@email.com'} /></Form.Item>
                 <Form.Item label="查询密码" required extra="6 位数字，请自行保存；支付后查看卡密需要验证。"><Input.Password prefix={<LockOutlined />} maxLength={6} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6 位数字" style={{ maxWidth: 260 }} /></Form.Item>
                 <Form.Item label="支付方式" required>
-                  {methods.length ? (
+                  {availableMethods.length ? (
                     <Radio.Group value={method} onChange={(event) => setMethod(event.target.value)}>
-                      {methods.map((item) => <Radio.Button key={item.method} value={item.method}>{item.label || methodFallback[item.method] || item.method}</Radio.Button>)}
+                      {availableMethods.map((item) => <Radio.Button key={item.method} value={item.method}>{item.label || methodFallback[item.method] || item.method}</Radio.Button>)}
                     </Radio.Group>
                   ) : (
                     <Alert type="error" showIcon message="暂无可用支付方式" description="请联系网站客服，或等待管理员启用支付通道。" />
@@ -128,7 +137,8 @@ export default function Cart() {
                 </Form.Item>
                 {method === 'usdt_trc20' && <Alert type="info" showIcon message={`参考金额：${usdt} USDT，实际收款地址以下单后的订单页为准。`} style={{ marginBottom: 16 }} />}
                 {(method === 'alipay' || method === 'wechat') && <Alert type="info" showIcon message="提交订单后会跳转到对应支付通道页面。" style={{ marginBottom: 16 }} />}
-                <Button type="primary" htmlType="submit" block size="large" icon={<ShoppingOutlined />} loading={submitting} disabled={!methods.length} style={{ height: 50, borderRadius: 14, fontWeight: 800 }}>提交订单 ¥{total.toFixed(2)}</Button>
+                {method === 'balance' && <Alert type="success" showIcon message={`将从账户余额扣除 ¥${total.toFixed(2)}，当前余额 ¥${(Number(user?.balanceCents || 0) / 100).toFixed(2)}。`} style={{ marginBottom: 16 }} />}
+                <Button type="primary" htmlType="submit" block size="large" icon={<ShoppingOutlined />} loading={submitting} disabled={!availableMethods.length} style={{ height: 50, borderRadius: 14, fontWeight: 800 }}>{method === 'balance' ? '使用余额支付' : '提交订单'} ¥{total.toFixed(2)}</Button>
               </Form>
             </Card>
           </Space>
