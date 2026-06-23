@@ -42,6 +42,7 @@ export const adminApi = {
   updateCategory: (id, data) => api.put('/admin/categories/' + id, data),
   deleteCategory: (id) => api.delete('/admin/categories/' + id),
   getInventory: (params) => api.get('/admin/inventory', { params }),
+  searchInventory: (data) => api.post('/admin/inventory/search', data),
   batchImport: (data) => api.post('/admin/inventory/batch-import', data),
   updateInventory: (id, data) => api.put('/admin/inventory/' + id, data),
   deleteInventory: (id) => api.delete('/admin/inventory/' + id),

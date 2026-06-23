@@ -6,6 +6,7 @@ const { adminAuth } = require('../../middleware/auth');
 const { validateBody } = require('../../middleware/validator');
 const { adminLimiter } = require('../../middleware/rateLimiter');
 const cardService = require('../../services/card');
+const { hash } = require('../../utils/crypto');
 const logger = require('../../utils/logger');
 
 const prisma = new PrismaClient();
@@ -21,6 +22,7 @@ const inventorySelect = {
   createdAt: true,
   soldAt: true,
   product: { select: { id: true, name: true, price: true, status: true } },
+  orderItem: { select: { order: { select: { orderNo: true } } } },
 };
 
 router.get('/inventory/stats', async (req, res, next) => {
@@ -70,6 +72,34 @@ router.post('/inventory/batch-import', validateBody(importSchema), async (req, r
     const result = await cardService.batchImport(productId, cards, skipDuplicates);
     logger.info('Inventory batch import', { productId, productName: product.name, imported: result.imported, skipped: result.skipped, adminId: req.admin.id });
     res.json({ message: '成功导入 ' + result.imported + ' 条，跳过 ' + result.skipped + ' 条重复', ...result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const inventorySearchSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('orderNo'), query: z.string().trim().min(1).max(128) }),
+  z.object({ type: z.literal('cardContent'), query: z.string().trim().min(1).max(16384) }),
+]);
+
+router.post('/inventory/search', validateBody(inventorySearchSchema), async (req, res, next) => {
+  try {
+    const query = req.body.query.trim();
+    const where = req.body.type === 'orderNo'
+      ? { orderItem: { is: { order: { is: { orderNo: query } } } } }
+      : { cardContentHash: hash(query) };
+    const items = await prisma.inventory.findMany({
+      where,
+      select: inventorySelect,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    logger.info('Inventory exact search', { type: req.body.type, resultCount: items.length, adminId: req.admin.id });
+    res.json({
+      items: items.map((item) => ({ ...item, shortHash: item.cardContentHash.slice(0, 12) })),
+      total: items.length,
+    });
   } catch (err) {
     next(err);
   }

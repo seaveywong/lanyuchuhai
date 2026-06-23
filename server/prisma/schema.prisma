@@ -57,6 +57,7 @@ model Inventory {
   soldAt               DateTime?  @map("sold_at")
 
   @@index([productId, status])
+  @@index([cardContentHash])
   @@map("inventory")
 }
 
