@@ -156,7 +156,7 @@ export default function Cart() {
             </Card>
             <Card title="下单信息" style={{ borderRadius: 18 }}>
               <Form layout="vertical" size="large" onFinish={submit}>
-                <Form.Item label="邮箱" required extra="用于查询订单和接收异常处理通知。"><Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="请输入接收订单通知的邮箱" autoComplete="email" /></Form.Item>
+                <Form.Item label="邮箱" required extra="用于查询订单和接收异常处理通知。"><Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="请输入接收订单通知的邮箱" autoComplete="off" /></Form.Item>
                 {needsEmailCode && <Form.Item label="邮箱验证码" required extra="验证下单邮箱归属，防止订单通知发送到错误邮箱。">
                   <Space.Compact style={{ maxWidth: 360, width: '100%' }}><Input value={emailCode} onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, '').slice(0, 6))} maxLength={6} placeholder="6 位验证码" /><Button loading={codeSending} onClick={sendOrderCode}>获取验证码</Button></Space.Compact>
                 </Form.Item>}
